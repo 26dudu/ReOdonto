@@ -10,8 +10,6 @@ App para gerenciar a realocação de clientes de uma clínica odontológica, per
 
 ## Estrutura do repositório
 
-O repositório está organizado em dois diretórios principais — `frontend` e `backend` — para deixar claro onde fica cada parte do sistema e preparar o projeto para as próximas etapas de desenvolvimento.
-
 ### `frontend/`
 
 Reservado para o desenvolvimento da interface do sistema: as telas e os recursos visuais usados pelo usuário.
@@ -19,7 +17,6 @@ Reservado para o desenvolvimento da interface do sistema: as telas e os recursos
 ### `backend/`
 
 Contém a versão inicial do framework escolhido para o desenvolvimento da API Web.
-
 
 ```
 ReOdonto/
@@ -32,7 +29,6 @@ ReOdonto/
     └── database/
         └── create_database.sql
 ```
-
 
 ## Nome dos participantes
 

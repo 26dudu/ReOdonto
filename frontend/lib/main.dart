@@ -12,10 +12,13 @@ class MeuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'ReOdonto',
       debugShowCheckedModeBanner: false,
+      builder: DevicePreview.appBuilder,
 
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: 'Roboto',
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color.fromARGB(255, 243, 248, 255),
           secondary: const Color.fromARGB(255, 30, 95, 216),

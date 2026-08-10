@@ -1,0 +1,10 @@
+from database.db import db
+
+class Dentista(db.Model):
+    __tablename__ = 'dentista'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    nome = db.Column(db.String(100), nullable=False)
+
+    def to_dict(self):
+        return {'id': self.id, 'nome': self.nome}

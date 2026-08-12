@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart'; 
-import '../label.dart'; 
+import '../label_text.dart'; 
 
 
 class SecurityInfoFields extends StatelessWidget {
-  final TextEditingController controladorSenha; 
+  final TextEditingController controladorSenha;
   final TextEditingController controladorConfirmarSenha; 
   final bool ocultarSenha; 
   final bool ocultarConfirmarSenha; 
-  final VoidCallback aoAlternarOcultarSenha;
+  final VoidCallback aoAlternarOcultarSenha; 
   final VoidCallback aoAlternarOcultarConfirmarSenha;
+
   const SecurityInfoFields({
     super.key,
     required this.controladorSenha,
@@ -22,7 +23,7 @@ class SecurityInfoFields extends StatelessWidget {
   @override
   Widget build(BuildContext contexto) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LabeledTextField(
           rotulo: 'Senha',

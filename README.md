@@ -5,7 +5,7 @@ App para gerenciar a realocação de clientes de uma clínica odontológica, per
 ## Tecnologias utilizadas
 
 - **Flutter** — front-end, interface para recepcionistas e atendentes acompanharem e remanejarem os agendamentos.
-- **Dart** — back-end (API/servidor), responsável pelas regras de negócio e pela comunicação com o banco de dados.
+- **Python** — back-end (API/servidor), responsável pelas regras de negócio e pela comunicação com o banco de dados.
 - **MySQL** — banco de dados, armazenamento dos dados de clientes, dentistas, horários e consultas.
 
 ## Estrutura do repositório

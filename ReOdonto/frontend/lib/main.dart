@@ -1,9 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import './pages/telaLogin.dart';
 
-void main() {
-  runApp(DevicePreview(builder: (context) => MeuApp()));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  if (kDebugMode) {
+    runApp(DevicePreview(builder: (context) => const MeuApp()));
+  } else {
+    runApp(const MeuApp());
+  }
 }
 
 class MeuApp extends StatelessWidget {
@@ -14,8 +21,7 @@ class MeuApp extends StatelessWidget {
     return MaterialApp(
       title: 'ReOdonto',
       debugShowCheckedModeBanner: false,
-      builder: DevicePreview.appBuilder,
-
+      builder: kDebugMode ? DevicePreview.appBuilder : null,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Roboto',
@@ -24,7 +30,6 @@ class MeuApp extends StatelessWidget {
           secondary: const Color.fromARGB(255, 30, 95, 216),
         ),
       ),
-
       home: const TelaLogin(),
     );
   }

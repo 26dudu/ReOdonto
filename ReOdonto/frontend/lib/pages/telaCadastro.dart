@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 import '../theme/app_colors.dart';
-import '../widgets/cadastro/cabecalho.dart';
+import '../services/api_service.dart';
+import '../services/sessao_usuario.dart';
+import '../widgets/cadastro/cabecalhoCadastro.dart';
 import '../widgets/cadastro/infoBasicas.dart';
-import '../widgets/cadastro/enderecoInfo.dart';
-import '../widgets/cadastro/senhas.dart';
+import '../widgets/cadastro/localizacaaoClinica.dart';
+import '../widgets/cadastro/senha.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -71,24 +73,78 @@ class _EstadoSignupPage extends State<SignupPage> {
     );
   }
 
-  Future<void> _criarConta() async {
+  void _mostrarErro(String mensagem) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(mensagem), backgroundColor: Colors.redAccent),
+    );
+  }
+
+  Future<void> _CriarConta() async {
+    final nome = _controladorNomeCompleto.text.trim();
+    final email = _controladorEmail.text.trim();
+    final senha = _controladorSenha.text;
+    final confirmarSenha = _controladorConfirmarSenha.text;
+
+    // Validações locais antes de chamar a API
+    if (nome.isEmpty) {
+      _mostrarErro('Nome é obrigatório');
+      return;
+    }
+    if (email.isEmpty || !email.contains('@')) {
+      _mostrarErro('Digite um email válido');
+      return;
+    }
+    if (senha.isEmpty) {
+      _mostrarErro('Digite uma senha');
+      return;
+    }
+    if (senha != confirmarSenha) {
+      _mostrarErro('As senhas não coincidem');
+      return;
+    }
+    if (senha.length < 6) {
+      _mostrarErro('A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
     setState(() => _carregando = true);
 
-    // TODO: integrar com o serviço/autenticação real
-    await Future.delayed(const Duration(seconds: 1));
+    final resultado = await ApiService.cadastrar(
+      nome: nome,
+      email: email,
+      senha: senha,
+      telefone: _controladorTelefone.text.trim(),
+      cpf: _controladorCpf.text.trim(),
+      cep: _controladorCep.text.trim(),
+      rua: _controladorRua.text.trim(),
+      bairro: _controladorBairro.text.trim(),
+      numero: _controladorNumero.text.trim(),
+    );
 
     if (!mounted) return;
     setState(() => _carregando = false);
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Conta criada (exemplo).')));
+    if (resultado.temErro) {
+      _mostrarErro(resultado.erro!);
+      return;
+    }
+
+    await SessaoUsuario.salvar(resultado.dados!);
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Conta criada com sucesso! Faça login.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+    Navigator.of(context).pop();
   }
 
-  void _cadastroGoogle() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Cadastro com Google.')));
+  void _tratarCadastroGoogle() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Cadastro com Google em breve.')),
+    );
   }
 
   @override
@@ -98,21 +154,21 @@ class _EstadoSignupPage extends State<SignupPage> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (contexto, restricoes) {
-            final Celular = restricoes.maxWidth < _quebraCelular;
+            final ehCelular = restricoes.maxWidth < _quebraCelular;
 
             return SingleChildScrollView(
               padding: EdgeInsets.symmetric(
-                horizontal: Celular ? 20 : 24,
+                horizontal: ehCelular ? 20 : 24,
                 vertical: 32,
               ),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: Celular
+                    maxWidth: ehCelular
                         ? _larguraMaximaCardCelular
-                        : _larguraMaximaCardDesktop, 
+                        : _larguraMaximaCardDesktop,
                   ),
-                  child: Celular
+                  child: ehCelular
                       ? _construirCardCelular()
                       : _construirCardDesktop(),
                 ),
@@ -130,24 +186,22 @@ class _EstadoSignupPage extends State<SignupPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-  children: [
-    IconButton(
-      onPressed: () {
-        Navigator.pop(context);
-      },
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      icon: const Icon(
-        Icons.arrow_back,
-        color: AppColors.textoEscuro,
-      ),
-    ),
-  ],
-),
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textoEscuro,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           const SignupHeader(
             titulo: 'Crie a sua conta no ReOdonto!',
             subtitulo: 'E facilite sua vida!',
-            logoNoTopo: true,
           ),
           const SizedBox(height: 28),
           IntrinsicHeight(
@@ -194,7 +248,7 @@ class _EstadoSignupPage extends State<SignupPage> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _carregando ? null : _criarConta,
+            onPressed: _carregando ? null : _CriarConta,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azulPrimario,
               foregroundColor: Colors.white,
@@ -233,7 +287,7 @@ class _EstadoSignupPage extends State<SignupPage> {
           SignInButton(
             Buttons.google,
             text: 'Cadastrar com Google',
-            onPressed: _cadastroGoogle,
+            onPressed: _tratarCadastroGoogle,
           ),
         ],
       ),
@@ -269,21 +323,20 @@ class _EstadoSignupPage extends State<SignupPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-           Row(
-  children: [
-    IconButton(
-      onPressed: () {
-        Navigator.pop(context);
-      },
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      icon: const Icon(
-        Icons.arrow_back,
-        color: AppColors.textoEscuro,
-      ),
-    ),
-  ],
-),
+          Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(
+                  Icons.arrow_back,
+                  color: AppColors.textoEscuro,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           const SignupHeader(
             titulo: 'Crie a sua conta no ReOdonto!',
             subtitulo: 'E facilite sua vida!',
@@ -334,7 +387,7 @@ class _EstadoSignupPage extends State<SignupPage> {
           SignInButton(
             Buttons.google,
             text: 'Cadastrar com Google',
-            onPressed: _cadastroGoogle,
+            onPressed: _tratarCadastroGoogle,
           ),
         ],
       ),
@@ -378,7 +431,7 @@ class _EstadoSignupPage extends State<SignupPage> {
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _carregando ? null : _criarConta,
+            onPressed: _carregando ? null : _CriarConta,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azulPrimario,
               foregroundColor: Colors.white,
@@ -403,6 +456,7 @@ class _EstadoSignupPage extends State<SignupPage> {
                   ),
           ),
           const SizedBox(height: 18),
+
           const Row(
             children: [
               Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
@@ -417,7 +471,7 @@ class _EstadoSignupPage extends State<SignupPage> {
           SignInButton(
             Buttons.google,
             text: 'Cadastrar com Google',
-            onPressed: _cadastroGoogle,
+            onPressed: _tratarCadastroGoogle,
           ),
         ],
       ),
@@ -459,6 +513,7 @@ class _IndicadorEtapa extends StatelessWidget {
   @override
   Widget build(BuildContext contexto) {
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(totalEtapas, (indice) {
         final estaAtiva = indice == etapaAtual;
         return AnimatedContainer(

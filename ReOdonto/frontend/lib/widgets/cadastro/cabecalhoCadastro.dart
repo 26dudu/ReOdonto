@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; 
 import '../../theme/app_colors.dart'; 
 
+
 class SignupHeader extends StatelessWidget {
-  final String titulo; 
-  final String? subtitulo; 
-  final bool mostrarLogo; 
-  final bool logoNoTopo; 
+  final String titulo; // Texto principal do cabeçalho.
+  final String? subtitulo; // Texto secundário, opcional.
+  final bool mostrarLogo; // Se falso, esconde o logo do dente.
+  final bool logoNoTopo; // Se true, coloca o logo no canto superior direito em vez de acima do título.
 
   const SignupHeader({
     super.key,
@@ -19,6 +20,7 @@ class SignupHeader extends StatelessWidget {
   @override
   Widget build(BuildContext contexto) {
     final colunaTitulo = Column(
+
       mainAxisSize: MainAxisSize.min, 
       children: [
         RichText(
@@ -33,8 +35,8 @@ class SignupHeader extends StatelessWidget {
           ),
         ),
         if (subtitulo != null) ...[
-         
-          const SizedBox(height: 4), 
+        
+          const SizedBox(height: 4),
           Text(
             subtitulo!, 
             textAlign: TextAlign.center,
@@ -51,8 +53,8 @@ class SignupHeader extends StatelessWidget {
     if (!mostrarLogo) return colunaTitulo; 
 
     if (logoNoTopo) {
+     
       return Stack(
-        
         clipBehavior: Clip.none, 
         children: [
           Center(child: colunaTitulo), 
@@ -68,7 +70,7 @@ class SignupHeader extends StatelessWidget {
                 BlendMode.srcIn,
               ),
             ),
-          ), 
+          ),
         ],
       );
     }
@@ -85,17 +87,18 @@ class SignupHeader extends StatelessWidget {
             BlendMode.srcIn,
           ),
         ), 
-        const SizedBox(height: 10), 
+        const SizedBox(height: 10),
         colunaTitulo,
       ],
     );
   }
 
-  
+
   List<TextSpan> _destacarReOdonto(String texto) {
+    
     const marcador = 'ReOdonto'; 
     final indice = texto.indexOf(marcador); 
-    if (indice == -1) return [TextSpan(text: texto)]; 
+    if (indice == -1) return [TextSpan(text: texto)];
 
     return [
       TextSpan(text: texto.substring(0, indice)), 

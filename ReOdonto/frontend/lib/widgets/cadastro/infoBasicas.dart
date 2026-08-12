@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart'; 
-import '../label.dart'; 
-
+import 'package:flutter/material.dart';
+import '../label_text.dart';
+import '../../utils/mascaras.dart';
 
 class BasicInfoFields extends StatelessWidget {
-  final TextEditingController controladorTelefone; 
-  final TextEditingController controladorNomeCompleto; 
+  final TextEditingController controladorTelefone;
+  final TextEditingController controladorNomeCompleto;
   final TextEditingController controladorEmail;
 
   const BasicInfoFields({
@@ -17,16 +17,17 @@ class BasicInfoFields extends StatelessWidget {
   @override
   Widget build(BuildContext contexto) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, 
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         LabeledTextField(
           rotulo: 'Telefone',
-          textoAjuda: 'Ex: (DDD) 9XXXX-XXXX',
+          textoAjuda: '(DDD) 9XXXX-XXXX',
           icone: Icons.phone_outlined,
           controlador: controladorTelefone,
-          tipoTeclado: TextInputType.phone, 
+          tipoTeclado: TextInputType.phone,
+          inputFormatters: [MascaraTelefone()],
         ),
-        const SizedBox(height: 16), 
+        const SizedBox(height: 16),
         LabeledTextField(
           rotulo: 'Nome Completo',
           textoAjuda: 'Ex: Arthur Fonseca Marechal',
@@ -39,7 +40,7 @@ class BasicInfoFields extends StatelessWidget {
           textoAjuda: 'Digite seu email',
           icone: Icons.mail_outline,
           controlador: controladorEmail,
-          tipoTeclado: TextInputType.emailAddress, 
+          tipoTeclado: TextInputType.emailAddress,
         ),
       ],
     );

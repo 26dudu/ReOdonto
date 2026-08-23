@@ -55,14 +55,68 @@ class _EstadoSignupPage extends State<SignupPage> {
     super.dispose();
   }
 
-  void _irParaEtapaSenha() {
-    setState(() => _etapaAtual = 1);
-    _controladorPaginaCelular.animateToPage(
-      1,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOut,
-    );
+
+
+
+  
+
+bool _validarDadosPessoais() {
+  final nome = _controladorNomeCompleto.text.trim();
+  final email = _controladorEmail.text.trim();
+  final telefone = _controladorTelefone.text.trim();
+  final cpf = _controladorCpf.text.trim();
+  final cep = _controladorCep.text.trim();
+  final rua = _controladorRua.text.trim();
+  final bairro = _controladorBairro.text.trim();
+  final numero = _controladorNumero.text.trim();
+
+  if (nome.isEmpty) {
+    _mostrarErro('Preencha o nome completo');
+    return false;
   }
+  if (email.isEmpty || !email.contains('@')) {
+    _mostrarErro('Digite um email válido');
+    return false;
+  }
+  if (telefone.isEmpty) {
+    _mostrarErro('Preencha o telefone');
+    return false;
+  }
+  if (cpf.isEmpty) {
+    _mostrarErro('Preencha o CPF');
+    return false;
+  }
+  if (cep.isEmpty) {
+    _mostrarErro('Preencha o CEP');
+    return false;
+  }
+  if (rua.isEmpty || bairro.isEmpty) {
+    _mostrarErro('Aguarde o preenchimento do endereço pelo CEP');
+    return false;
+  }
+  if (numero.isEmpty) {
+    _mostrarErro('Preencha o número do endereço');
+    return false;
+  }
+  return true;
+}
+
+void _irParaEtapaSenha() {
+  // Só avança se todos os campos da primeira etapa estiverem preenchidos
+  if (!_validarDadosPessoais()) return;
+
+  setState(() => _etapaAtual = 1);
+  _controladorPaginaCelular.animateToPage(
+    1,
+    duration: const Duration(milliseconds: 280),
+    curve: Curves.easeInOut,
+  );
+}
+
+
+
+
+
 
   void _irParaEtapaDadosPessoais() {
     setState(() => _etapaAtual = 0);

@@ -1,4 +1,5 @@
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 import services.consulta_service as service
 
 consulta_bp = Blueprint('consulta', __name__, url_prefix='/consultas')
@@ -11,7 +12,25 @@ def _json_ou_erro():
     return data, None
 
 
+# --- Rotas de leitura — requerem login ---
+
+@consulta_bp.route('/', methods=['GET'])
+@jwt_required()
+def listar():
+    """Lista todos os tipos de consulta disponíveis. Requer paciente logado."""
+    return jsonify([c.to_dict() for c in service.listar_consultas()])
+
+
+@consulta_bp.route('/<int:id>', methods=['GET'])
+@jwt_required()
+def buscar(id):
+    return jsonify(service.buscar_consulta(id).to_dict())
+
+
+# --- Rotas de escrita — requerem login ---
+
 @consulta_bp.route('/', methods=['POST'])
+@jwt_required()
 def criar():
     data, erro = _json_ou_erro()
     if erro:
@@ -23,17 +42,8 @@ def criar():
         return jsonify({'erro': str(e)}), 400
 
 
-@consulta_bp.route('/', methods=['GET'])
-def listar():
-    return jsonify([c.to_dict() for c in service.listar_consultas()])
-
-
-@consulta_bp.route('/<int:id>', methods=['GET'])
-def buscar(id):
-    return jsonify(service.buscar_consulta(id).to_dict())
-
-
 @consulta_bp.route('/<int:id>', methods=['PUT'])
+@jwt_required()
 def atualizar(id):
     data, erro = _json_ou_erro()
     if erro:
@@ -46,6 +56,7 @@ def atualizar(id):
 
 
 @consulta_bp.route('/<int:id>', methods=['DELETE'])
+@jwt_required()
 def deletar(id):
     service.deletar_consulta(id)
     return '', 204

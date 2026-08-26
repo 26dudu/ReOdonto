@@ -24,7 +24,25 @@ def criar_dentista(data):
     return dentista
 
 
-def listar_dentistas():
+def listar_dentistas(clinica_id: int | None = None):
+    """Lista dentistas, opcionalmente filtrados pela clínica onde atendem.
+    
+    Se clinica_id for fornecido, retorna apenas dentistas que têm pelo menos
+    um agendamento nessa clínica (proxy simples sem tabela clinica_dentista).
+    Para um relacionamento real, adicione a tabela clinica_dentista no futuro.
+    """
+    if clinica_id:
+        from models.agendamento_model import Agendamento
+        ids = (
+            db.session.query(Agendamento.dentista_id)
+            .filter(Agendamento.clinica_id == clinica_id)
+            .distinct()
+            .all()
+        )
+        id_list = [row[0] for row in ids]
+        if not id_list:
+            return []
+        return Dentista.query.filter(Dentista.id.in_(id_list)).all()
     return Dentista.query.all()
 
 

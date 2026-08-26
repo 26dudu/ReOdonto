@@ -1,0 +1,53 @@
+# ==============================================
+# ReOdonto — .gitignore raiz do projeto
+# ==============================================
+
+# Variáveis de ambiente — NUNCA commitar
+.env
+*.env
+!.env.example
+
+# Banco de dados SQLite local
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+pip-wheel-metadata/
+*.log
+
+# Flask
+instance/
+.webassets-cache
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

@@ -1,5 +1,10 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
+from flask_jwt_extended import (
+    jwt_required,
+    get_jwt_identity,
+    create_access_token,
+    get_jwt,
+)
 import services.paciente_service as service
 
 paciente_bp = Blueprint('paciente', __name__, url_prefix='/pacientes')
@@ -27,7 +32,13 @@ def criar():
 
 @paciente_bp.route('/login', methods=['POST'])
 def login():
-    """Login — rota pública. Retorna JWT em caso de sucesso."""
+    """Login — rota pública. Retorna JWT em caso de sucesso.
+    
+    O token JWT é assinado com JWT_SECRET_KEY (HS256 por padrão no flask-jwt-extended)
+    e carrega como identidade o id do paciente. Dados adicionais (nome, email)
+    são embutidos como additional_claims para que o Flutter possa lê-los
+    sem precisar de uma chamada extra ao /pacientes/<id> logo após o login.
+    """
     data, erro = _json_ou_erro()
     if erro:
         return erro
@@ -43,11 +54,24 @@ def login():
         if not service.verificar_senha(paciente, senha):
             return jsonify({'erro': 'Email ou senha inválidos'}), 401
 
-        # Emite token JWT com o id do paciente como identidade
-        token = create_access_token(identity=str(paciente.id))
+        paciente_dict = paciente.to_dict()
+
+        # Emite token JWT assinado:
+        # - identity: id do paciente (string, como exige flask-jwt-extended)
+        # - additional_claims: dados públicos do paciente embutidos no payload
+        #   (não inclui senha nem dados criptografados sensíveis)
+        additional_claims = {
+            'nome':  paciente_dict.get('nome'),
+            'email': paciente_dict.get('email'),
+            'tipo':  'paciente',
+        }
+        token = create_access_token(
+            identity=str(paciente.id),
+            additional_claims=additional_claims,
+        )
         return jsonify({
             'token': token,
-            'paciente': paciente.to_dict(),
+            'paciente': paciente_dict,
         }), 200
     except ValueError as e:
         return jsonify({'erro': str(e)}), 401

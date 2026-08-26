@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 import '../theme/app_colors.dart';
 import '../services/api_service.dart';
-import '../services/sessao_usuario.dart';
+import '../utils/validadores.dart';
 import '../widgets/cadastro/cabecalhoCadastro.dart';
 import '../widgets/cadastro/infoBasicas.dart';
 import '../widgets/cadastro/localizacaaoClinica.dart';
@@ -55,7 +55,53 @@ class _EstadoSignupPage extends State<SignupPage> {
     super.dispose();
   }
 
+  bool _validarDadosPessoais() {
+    final nome = _controladorNomeCompleto.text.trim();
+    final email = _controladorEmail.text.trim();
+    final telefone = _controladorTelefone.text.trim();
+    final cpf = _controladorCpf.text.trim();
+    final cep = _controladorCep.text.trim();
+    final rua = _controladorRua.text.trim();
+    final bairro = _controladorBairro.text.trim();
+    final numero = _controladorNumero.text.trim();
+
+    if (nome.isEmpty) {
+      _mostrarErro('Preencha o nome completo');
+      return false;
+    }
+    if (email.isEmpty || !email.contains('@')) {
+      _mostrarErro('Digite um email válido');
+      return false;
+    }
+    if (telefone.isEmpty) {
+      _mostrarErro('Preencha o telefone');
+      return false;
+    }
+    if (cpf.isEmpty) {
+      _mostrarErro('Preencha o CPF');
+      return false;
+    }
+    if (!validarCpf(cpf)) {
+      _mostrarErro('CPF inválido');
+      return false;
+    }
+    if (cep.isEmpty) {
+      _mostrarErro('Preencha o CEP');
+      return false;
+    }
+    if (rua.isEmpty || bairro.isEmpty) {
+      _mostrarErro('Aguarde o preenchimento do endereço pelo CEP');
+      return false;
+    }
+    if (numero.isEmpty) {
+      _mostrarErro('Preencha o número do endereço');
+      return false;
+    }
+    return true;
+  }
+
   void _irParaEtapaSenha() {
+    if (!_validarDadosPessoais()) return;
     setState(() => _etapaAtual = 1);
     _controladorPaginaCelular.animateToPage(
       1,
@@ -79,13 +125,12 @@ class _EstadoSignupPage extends State<SignupPage> {
     );
   }
 
-  Future<void> _CriarConta() async {
+  Future<void> _criarConta() async {
     final nome = _controladorNomeCompleto.text.trim();
     final email = _controladorEmail.text.trim();
     final senha = _controladorSenha.text;
     final confirmarSenha = _controladorConfirmarSenha.text;
 
-    // Validações locais antes de chamar a API
     if (nome.isEmpty) {
       _mostrarErro('Nome é obrigatório');
       return;
@@ -107,6 +152,8 @@ class _EstadoSignupPage extends State<SignupPage> {
       return;
     }
 
+    // Previne duplo clique
+    if (_carregando) return;
     setState(() => _carregando = true);
 
     final resultado = await ApiService.cadastrar(
@@ -128,9 +175,6 @@ class _EstadoSignupPage extends State<SignupPage> {
       _mostrarErro(resultado.erro!);
       return;
     }
-
-    await SessaoUsuario.salvar(resultado.dados!);
-    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -155,7 +199,6 @@ class _EstadoSignupPage extends State<SignupPage> {
         child: LayoutBuilder(
           builder: (contexto, restricoes) {
             final ehCelular = restricoes.maxWidth < _quebraCelular;
-
             return SingleChildScrollView(
               padding: EdgeInsets.symmetric(
                 horizontal: ehCelular ? 20 : 24,
@@ -191,10 +234,7 @@ class _EstadoSignupPage extends State<SignupPage> {
                 onPressed: () => Navigator.of(context).pop(),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textoEscuro,
-                ),
+                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
               ),
             ],
           ),
@@ -226,8 +266,7 @@ class _EstadoSignupPage extends State<SignupPage> {
                         aoAlternarOcultarSenha: () =>
                             setState(() => _ocultarSenha = !_ocultarSenha),
                         aoAlternarOcultarConfirmarSenha: () => setState(
-                          () =>
-                              _ocultarConfirmarSenha = !_ocultarConfirmarSenha,
+                          () => _ocultarConfirmarSenha = !_ocultarConfirmarSenha,
                         ),
                       ),
                     ],
@@ -248,14 +287,12 @@ class _EstadoSignupPage extends State<SignupPage> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _carregando ? null : _CriarConta,
+            onPressed: _carregando ? null : _criarConta,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azulPrimario,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             child: _carregando
@@ -267,28 +304,12 @@ class _EstadoSignupPage extends State<SignupPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Text(
-                    'Criar conta',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                : const Text('Criar conta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
-          const Row(
-            children: [
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('ou', style: TextStyle(color: Colors.grey)),
-              ),
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-            ],
-          ),
+          const _Divisor(),
           const SizedBox(height: 18),
-          SignInButton(
-            Buttons.google,
-            text: 'Cadastrar com Google',
-            onPressed: _tratarCadastroGoogle,
-          ),
+          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
         ],
       ),
     );
@@ -329,18 +350,12 @@ class _EstadoSignupPage extends State<SignupPage> {
                 onPressed: () => Navigator.of(context).pop(),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textoEscuro,
-                ),
+                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const SignupHeader(
-            titulo: 'Crie a sua conta no ReOdonto!',
-            subtitulo: 'E facilite sua vida!',
-          ),
+          const SignupHeader(titulo: 'Crie a sua conta no ReOdonto!', subtitulo: 'E facilite sua vida!'),
           const SizedBox(height: 20),
           BasicInfoFields(
             controladorTelefone: _controladorTelefone,
@@ -362,33 +377,15 @@ class _EstadoSignupPage extends State<SignupPage> {
               backgroundColor: AppColors.azulPrimario,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            child: const Text(
-              'Continuar',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
+            child: const Text('Continuar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
-          const Row(
-            children: [
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('ou', style: TextStyle(color: Colors.grey)),
-              ),
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-            ],
-          ),
+          const _Divisor(),
           const SizedBox(height: 18),
-          SignInButton(
-            Buttons.google,
-            text: 'Cadastrar com Google',
-            onPressed: _tratarCadastroGoogle,
-          ),
+          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
         ],
       ),
     );
@@ -405,40 +402,30 @@ class _EstadoSignupPage extends State<SignupPage> {
                 onPressed: _irParaEtapaDadosPessoais,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: AppColors.textoEscuro,
-                ),
+                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const SignupHeader(
-            titulo: 'Continue criando sua conta',
-            mostrarLogo: false,
-          ),
+          const SignupHeader(titulo: 'Continue criando sua conta', mostrarLogo: false),
           const SizedBox(height: 20),
           SecurityInfoFields(
             controladorSenha: _controladorSenha,
             controladorConfirmarSenha: _controladorConfirmarSenha,
             ocultarSenha: _ocultarSenha,
             ocultarConfirmarSenha: _ocultarConfirmarSenha,
-            aoAlternarOcultarSenha: () =>
-                setState(() => _ocultarSenha = !_ocultarSenha),
-            aoAlternarOcultarConfirmarSenha: () => setState(
-              () => _ocultarConfirmarSenha = !_ocultarConfirmarSenha,
-            ),
+            aoAlternarOcultarSenha: () => setState(() => _ocultarSenha = !_ocultarSenha),
+            aoAlternarOcultarConfirmarSenha: () =>
+                setState(() => _ocultarConfirmarSenha = !_ocultarConfirmarSenha),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
-            onPressed: _carregando ? null : _CriarConta,
+            onPressed: _carregando ? null : _criarConta,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azulPrimario,
               foregroundColor: Colors.white,
               minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
             child: _carregando
@@ -450,38 +437,24 @@ class _EstadoSignupPage extends State<SignupPage> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Text(
-                    'Criar conta',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                : const Text('Criar conta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 18),
-
-          const Row(
-            children: [
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Text('ou', style: TextStyle(color: Colors.grey)),
-              ),
-              Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
-            ],
-          ),
+          const _Divisor(),
           const SizedBox(height: 18),
-          SignInButton(
-            Buttons.google,
-            text: 'Cadastrar com Google',
-            onPressed: _tratarCadastroGoogle,
-          ),
+          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
         ],
       ),
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// Widgets auxiliares
+// ---------------------------------------------------------------------------
+
 class _Card extends StatelessWidget {
   final Widget conteudo;
-
   const _Card({required this.conteudo});
 
   @override
@@ -507,7 +480,6 @@ class _Card extends StatelessWidget {
 class _IndicadorEtapa extends StatelessWidget {
   final int etapaAtual;
   final int totalEtapas;
-
   const _IndicadorEtapa({required this.etapaAtual, required this.totalEtapas});
 
   @override
@@ -527,6 +499,24 @@ class _IndicadorEtapa extends StatelessWidget {
           ),
         );
       }),
+    );
+  }
+}
+
+class _Divisor extends StatelessWidget {
+  const _Divisor();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text('ou', style: TextStyle(color: Colors.grey)),
+        ),
+        Expanded(child: Divider(color: Color(0xFFE2E8F0), thickness: 1)),
+      ],
     );
   }
 }

@@ -1,20 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
+import 'package:reodonto/pages/telaPerfil.dart';
+import 'package:reodonto/pages/telaAgenda.dart';
 import './pages/telaLogin.dart';
+import './services/sessao_usuario.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final bool temSessao = await SessaoUsuario.carregar();
 
   if (kDebugMode) {
-    runApp(DevicePreview(builder: (context) => const MeuApp()));
+    runApp(DevicePreview(builder: (context) => MeuApp(temSessao: temSessao)));
   } else {
-    runApp(const MeuApp());
+    runApp(MeuApp(temSessao: temSessao));
   }
 }
 
 class MeuApp extends StatelessWidget {
-  const MeuApp({super.key});
+  final bool temSessao;
+  const MeuApp({super.key, required this.temSessao});
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +35,14 @@ class MeuApp extends StatelessWidget {
           secondary: const Color.fromARGB(255, 30, 95, 216),
         ),
       ),
-      home: const TelaLogin(),
+      home: temSessao ? const TelaPerfil() : const TelaLogin(),
+
+      // Rotas nomeadas usadas pelo menu (BarraLateralMenu / MenuSanduiche)
+      // para trocar de tela. Adicione aqui conforme telaMenu.dart e telaAlertas.dart forem implementadas.
+      routes: {
+        '/perfil': (context) => const TelaPerfil(),
+        '/agenda': (context) => const TelaAgenda(),
+      },
     );
   }
 }

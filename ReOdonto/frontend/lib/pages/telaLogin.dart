@@ -58,10 +58,7 @@ class _TelaLoginState extends State<TelaLogin> {
 
     if (!mounted) return;
 
-    // TODO: navegar para a tela home quando ela existir
-    // Navigator.of(context).pushReplacement(
-    //   MaterialPageRoute(builder: (_) => const TelaHome()),
-    // );
+    Navigator.of(context).pushReplacementNamed('/perfil');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Bem-vindo, ${SessaoUsuario.nome}!')),

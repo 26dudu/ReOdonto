@@ -33,11 +33,28 @@ Map<String, String> get _headersAuth {
 class ApiResultado<T> {
   final T? dados;
   final String? erro;
+  final bool sessaoExpirada; // true quando o backend retorna 401
 
-  const ApiResultado.sucesso(this.dados) : erro = null;
-  const ApiResultado.falha(this.erro) : dados = null;
+  const ApiResultado.sucesso(this.dados)
+      : erro = null,
+        sessaoExpirada = false;
+
+  const ApiResultado.falha(this.erro, {this.sessaoExpirada = false})
+      : dados = null;
 
   bool get temErro => erro != null;
+}
+
+/// Verifica se a resposta é 401 e retorna o resultado adequado.
+ApiResultado<T> _tratarResposta401<T>(http.Response response, T dados) {
+  if (response.statusCode == 401) {
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    return ApiResultado.falha(
+      body['erro'] ?? 'Sessão expirada. Faça login novamente.',
+      sessaoExpirada: true,
+    );
+  }
+  return ApiResultado.sucesso(dados);
 }
 
 class ApiService {
@@ -257,4 +274,138 @@ class ApiService {
       return ApiResultado.falha('Erro inesperado: $e');
     }
   }
+
+  // ----------------------------------------------------------------
+  // BUSCAR PERFIL — GET /pacientes/<id>
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> buscarPerfil(int id) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/pacientes/$id'),
+            headers: _headersAuth,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao buscar perfil');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // ATUALIZAR PERFIL — PUT /pacientes/<id>
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> atualizarPerfil(
+    int id, {
+    required String nome,
+    String? email,
+    String? telefone,
+    String? cpf,
+    String? cep,
+    String? rua,
+    String? bairro,
+    String? numero,
+    String? senha,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$_baseUrl/pacientes/$id'),
+            headers: _headersAuth,
+            body: jsonEncode({
+              'nome': nome,
+              if (email != null && email.isNotEmpty) 'email': email,
+              if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
+              if (cpf != null && cpf.isNotEmpty) 'cpf': cpf,
+              if (cep != null && cep.isNotEmpty) 'cep': cep,
+              if (rua != null && rua.isNotEmpty) 'rua': rua,
+              if (bairro != null && bairro.isNotEmpty) 'bairro': bairro,
+              if (numero != null && numero.isNotEmpty) 'numero': numero,
+              if (senha != null && senha.isNotEmpty) 'senha': senha,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao atualizar perfil');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // LISTAR DENTISTAS — GET /dentistas/?clinica_id=X (opcional)
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<List<dynamic>>> listarDentistas({int? clinicaId}) async {
+    try {
+      final uri = Uri.parse('$_baseUrl/dentistas/').replace(
+        queryParameters: clinicaId != null ? {'clinica_id': '$clinicaId'} : null,
+      );
+      final response = await http
+          .get(uri, headers: _headersAuth)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return ApiResultado.sucesso(jsonDecode(response.body) as List<dynamic>);
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao listar dentistas');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // LISTAR CONSULTAS — GET /consultas/
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<List<dynamic>>> listarConsultas() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_baseUrl/consultas/'), headers: _headersAuth)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return ApiResultado.sucesso(jsonDecode(response.body) as List<dynamic>);
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao listar consultas');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // DELETAR PERFIL — DELETE /pacientes/<id>
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<void>> deletarConta(int id) async {
+    try {
+      final response = await http
+          .delete(
+            Uri.parse('$_baseUrl/pacientes/$id'),
+            headers: _headersAuth,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 204) return const ApiResultado.sucesso(null);
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao deletar conta');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
 }
+

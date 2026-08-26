@@ -1,6 +1,7 @@
 import os
 import logging
-from flask import Flask, jsonify
+from datetime import timedelta
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from database.db import db
@@ -10,6 +11,13 @@ from controllers.clinica_controller import clinica_bp
 from controllers.consulta_controller import consulta_bp
 from controllers.agendamento_controller import agendamento_bp
 from controllers.cep_controller import cep_bp
+
+# Carrega variáveis do arquivo .env se existir (python-dotenv opcional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv não instalado — usa variáveis de ambiente do sistema
 
 # --- Logging ---
 logging.basicConfig(
@@ -23,12 +31,41 @@ app = Flask(__name__)
 # --- Segurança ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-troque-em-producao')
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-troque-em-producao')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # token expira em 8h
 
-# CORS restrito — em produção troque pelo domínio real do app
-allowed_origins = os.environ.get('ALLOWED_ORIGINS', 'http://localhost:*').split(',')
-CORS(app, origins=allowed_origins)
+# CORS — em produção substitua '*' pelo domínio real do app
+CORS(app, origins=os.environ.get('CORS_ORIGINS', '*'), supports_credentials=False)
 
-JWTManager(app)
+jwt = JWTManager(app)
+
+# --- Proteção de Content-Type em rotas que recebem JSON ---
+# Rejeita requisições POST/PUT/PATCH sem o header correto (evita CSRF simples)
+@app.before_request
+def verificar_content_type():
+    if request.method in ('POST', 'PUT', 'PATCH'):
+        # Rotas públicas de leitura (GET do CEP) não chegam aqui,
+        # mas rotas de escrita devem enviar JSON
+        ct = request.content_type or ''
+        if request.data and 'application/json' not in ct:
+            return jsonify({'erro': 'Content-Type deve ser application/json'}), 415
+
+# --- Handlers JWT — sempre retornam JSON limpo ---
+
+@jwt.unauthorized_loader
+def token_ausente(motivo):
+    return jsonify({'erro': 'Token ausente. Faça login para continuar.'}), 401
+
+@jwt.invalid_token_loader
+def token_invalido(motivo):
+    return jsonify({'erro': 'Token inválido. Faça login novamente.'}), 401
+
+@jwt.expired_token_loader
+def token_expirado(jwt_header, jwt_data):
+    return jsonify({'erro': 'Sessão expirada. Faça login novamente.'}), 401
+
+@jwt.revoked_token_loader
+def token_revogado(jwt_header, jwt_data):
+    return jsonify({'erro': 'Token revogado. Faça login novamente.'}), 401
 
 # --- Banco SQLite ---
 db_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database')
@@ -39,7 +76,6 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # --- Habilitar Foreign Keys no SQLite ---
-# SQLite não habilita FK por padrão — sem isso, agendamentos com IDs inválidos são aceitos
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 import sqlite3
@@ -72,7 +108,11 @@ def bad_request(e):
 
 @app.errorhandler(401)
 def unauthorized(e):
-    return jsonify({'erro': 'Não autorizado'}), 401
+    return jsonify({'erro': 'Não autorizado. Faça login para continuar.'}), 401
+
+@app.errorhandler(403)
+def forbidden(e):
+    return jsonify({'erro': 'Acesso negado'}), 403
 
 @app.errorhandler(404)
 def not_found(e):
@@ -81,10 +121,6 @@ def not_found(e):
 @app.errorhandler(405)
 def method_not_allowed(e):
     return jsonify({'erro': 'Método HTTP não permitido nesta rota'}), 405
-
-@app.errorhandler(422)
-def unprocessable(e):
-    return jsonify({'erro': 'Token inválido ou expirado'}), 422
 
 @app.errorhandler(500)
 def internal_error(e):

@@ -1,29 +1,37 @@
 from database.db import db
 from models.agendamento_model import Agendamento
-from models.paciente_model import Paciente
 from models.dentista_model import Dentista
 from models.consulta_model import Consulta
 from models.clinica_model import Clinica
 from datetime import datetime, timedelta
 
 
-def _validar_fks(data):
-    """Verifica se os IDs referenciados existem no banco antes de inserir."""
-    if not db.session.get(Paciente, data['paciente_id']):
-        raise ValueError(f"Paciente {data['paciente_id']} não encontrado")
+def criar_agendamento(data):
+    """
+    Cria um novo agendamento.
+
+    Campos obrigatórios: dentista_id, data_hora
+    Opcionais: clinica_id, consulta_id OU consulta_customizada,
+               nome_paciente, telefone_paciente
+    """
+    if not data.get('dentista_id'):
+        raise ValueError('Campo obrigatório ausente: dentista_id')
+    if not data.get('data_hora'):
+        raise ValueError('Campo obrigatório ausente: data_hora')
+
+    # Valida dentista
     if not db.session.get(Dentista, data['dentista_id']):
         raise ValueError(f"Dentista {data['dentista_id']} não encontrado")
-    if not db.session.get(Consulta, data['consulta_id']):
-        raise ValueError(f"Consulta {data['consulta_id']} não encontrada")
-    if not db.session.get(Clinica, data['clinica_id']):
-        raise ValueError(f"Clínica {data['clinica_id']} não encontrada")
 
+    # Valida consulta (se fornecida)
+    consulta_id = data.get('consulta_id')
+    if consulta_id and not db.session.get(Consulta, consulta_id):
+        raise ValueError(f"Consulta {consulta_id} não encontrada")
 
-def criar_agendamento(data):
-    campos_obrigatorios = ['paciente_id', 'dentista_id', 'consulta_id', 'clinica_id', 'data_hora']
-    for campo in campos_obrigatorios:
-        if data.get(campo) is None:
-            raise ValueError(f'Campo obrigatório ausente: {campo}')
+    # Valida clínica (se fornecida)
+    clinica_id = data.get('clinica_id')
+    if clinica_id and not db.session.get(Clinica, clinica_id):
+        raise ValueError(f"Clínica {clinica_id} não encontrada")
 
     # Parse de data_hora — ISO 8601: "2025-08-15T14:00:00"
     try:
@@ -31,13 +39,7 @@ def criar_agendamento(data):
     except (ValueError, TypeError):
         raise ValueError('Formato de data_hora inválido. Use ISO 8601: "2025-08-15T14:00:00"')
 
-    if data_hora < datetime.now():
-        raise ValueError('Não é possível agendar em uma data/hora no passado')
-
-    # Valida que os IDs existem (FK explícita — SQLite pode não barrar sozinho)
-    _validar_fks(data)
-
-    # Verifica conflito de horário usando range de ±1 minuto para evitar problemas de precisão DateTime
+    # Verifica conflito de horário para o mesmo dentista
     janela_inicio = data_hora - timedelta(seconds=59)
     janela_fim = data_hora + timedelta(seconds=59)
     conflito = Agendamento.query.filter(
@@ -50,10 +52,12 @@ def criar_agendamento(data):
         raise ValueError('O dentista já possui um agendamento nesse horário')
 
     agendamento = Agendamento(
-        paciente_id=data['paciente_id'],
         dentista_id=data['dentista_id'],
-        consulta_id=data['consulta_id'],
-        clinica_id=data['clinica_id'],
+        clinica_id=clinica_id,
+        consulta_id=consulta_id,
+        consulta_customizada=data.get('consulta_customizada'),
+        nome_paciente=data.get('nome_paciente'),
+        telefone_paciente=data.get('telefone_paciente'),
         data_hora=data_hora,
         status='agendado',
     )
@@ -62,12 +66,16 @@ def criar_agendamento(data):
     return agendamento
 
 
-def listar_agendamentos(paciente_id=None, dentista_id=None):
-    """Sempre filtra — sem filtro retorna vazio para não expor dados de todos."""
-    if paciente_id:
-        return Agendamento.query.filter_by(paciente_id=paciente_id).all()
+def listar_agendamentos(dentista_id=None):
+    """Lista agendamentos do dentista — exclui cancelados."""
     if dentista_id:
-        return Agendamento.query.filter_by(dentista_id=dentista_id).all()
+        return (
+            Agendamento.query
+            .filter_by(dentista_id=dentista_id)
+            .filter(Agendamento.status != 'cancelado')
+            .order_by(Agendamento.data_hora)
+            .all()
+        )
     return []
 
 
@@ -76,7 +84,6 @@ def buscar_agendamento(id):
 
 
 def atualizar_status(id, novo_status):
-    """Só altera o status — não permite trocar paciente, dentista ou clínica."""
     status_validos = ['agendado', 'concluido', 'cancelado']
     if novo_status not in status_validos:
         raise ValueError(f'Status inválido. Use: {status_validos}')
@@ -87,6 +94,16 @@ def atualizar_status(id, novo_status):
         raise ValueError('Não é possível alterar um agendamento já concluído')
 
     agendamento.status = novo_status
+    db.session.commit()
+    return agendamento
+
+
+def preencher_paciente(id, nome, telefone):
+    """Preenche nome e telefone de um agendamento vago (walk-in)."""
+    agendamento = db.get_or_404(Agendamento, id)
+    agendamento.nome_paciente = nome
+    agendamento.telefone_paciente = telefone
+    agendamento.status = 'agendado'
     db.session.commit()
     return agendamento
 

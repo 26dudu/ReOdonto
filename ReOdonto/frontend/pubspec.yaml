@@ -39,6 +39,8 @@ dependencies:
   flutter_svg: ^2.2.0
   http: ^1.2.2
   shared_preferences: ^2.3.2
+  google_sign_in: ^6.2.1
+  google_sign_in_web: ^0.12.0 # Versão que suporta FedCM
 
 dev_dependencies:
   flutter_test:
@@ -93,3 +95,5 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+  

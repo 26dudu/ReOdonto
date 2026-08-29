@@ -11,7 +11,7 @@ class LabeledTextField extends StatelessWidget {
   final VoidCallback? aoAlternarOcultar;
   final TextEditingController? controlador;
   final TextInputType tipoTeclado;
-  final List<TextInputFormatter>? inputFormatters; // <-- novo
+  final List<TextInputFormatter>? inputFormatters; 
   final bool somenteLeitura;
 
   const LabeledTextField({
@@ -51,7 +51,7 @@ class LabeledTextField extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             color: somenteLeitura
-                ? AppColors.textoCinza   // texto mais apagado quando bloqueado
+                ? AppColors.textoCinza  
                 : AppColors.textoEscuro,
           ),
           decoration: InputDecoration(
@@ -62,7 +62,7 @@ class LabeledTextField extends StatelessWidget {
             ),
             filled: true,
             fillColor: somenteLeitura
-                ? AppColors.bordaCampo   // fundo cinza quando bloqueado
+                ? AppColors.bordaCampo   
                 : AppColors.preenchimentoCampo,
             prefixIcon: Icon(
               icone,

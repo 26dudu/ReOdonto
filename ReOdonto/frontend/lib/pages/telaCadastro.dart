@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:sign_in_button/sign_in_button.dart';
 import '../theme/app_colors.dart';
-import '../services/api_service.dart';
-import '../utils/validadores.dart';
+import '../utils/mascaras.dart';
 import '../widgets/cadastro/cabecalhoCadastro.dart';
-import '../widgets/cadastro/infoBasicas.dart';
-import '../widgets/cadastro/localizacaaoClinica.dart';
-import '../widgets/cadastro/senha.dart';
+import '../widgets/cadastro/campo_cadastro.dart';
+import 'telaSenhaCadastro.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -16,173 +15,109 @@ class SignupPage extends StatefulWidget {
 }
 
 class _EstadoSignupPage extends State<SignupPage> {
-  final _controladorTelefone = TextEditingController();
-  final _controladorNomeCompleto = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  final _controladorNome = TextEditingController();
   final _controladorEmail = TextEditingController();
+  final _controladorTelefone = TextEditingController();
+  final _controladorCpfCnpj = TextEditingController();
+  final _controladorCro = TextEditingController();
 
-  final _controladorCpf = TextEditingController();
-  final _controladorCep = TextEditingController();
-  final _controladorRua = TextEditingController();
-  final _controladorBairro = TextEditingController();
-  final _controladorNumero = TextEditingController();
-
-  final _controladorSenha = TextEditingController();
-  final _controladorConfirmarSenha = TextEditingController();
-  bool _ocultarSenha = true;
-  bool _ocultarConfirmarSenha = true;
-
-  final _controladorPaginaCelular = PageController();
-  int _etapaAtual = 0;
-  bool _carregando = false;
-
-  static const double _quebraCelular = 700;
-  static const double _larguraMaximaCardDesktop = 780;
-  static const double _larguraMaximaCardCelular = 440;
+  static const double _larguraMaxima = 480;
 
   @override
   void dispose() {
-    _controladorTelefone.dispose();
-    _controladorNomeCompleto.dispose();
+    _controladorNome.dispose();
     _controladorEmail.dispose();
-    _controladorCpf.dispose();
-    _controladorCep.dispose();
-    _controladorRua.dispose();
-    _controladorBairro.dispose();
-    _controladorNumero.dispose();
-    _controladorSenha.dispose();
-    _controladorConfirmarSenha.dispose();
-    _controladorPaginaCelular.dispose();
+    _controladorTelefone.dispose();
+    _controladorCpfCnpj.dispose();
+    _controladorCro.dispose();
     super.dispose();
   }
 
-  bool _validarDadosPessoais() {
-    final nome = _controladorNomeCompleto.text.trim();
-    final email = _controladorEmail.text.trim();
-    final telefone = _controladorTelefone.text.trim();
-    final cpf = _controladorCpf.text.trim();
-    final cep = _controladorCep.text.trim();
-    final rua = _controladorRua.text.trim();
-    final bairro = _controladorBairro.text.trim();
-    final numero = _controladorNumero.text.trim();
+  String? _validarNome(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Preencha o nome completo';
+    if (v.trim().length < 3) return 'Nome deve ter pelo menos 3 caracteres';
+    return null;
+  }
 
-    if (nome.isEmpty) {
-      _mostrarErro('Preencha o nome completo');
-      return false;
+  String? _validarEmail(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Preencha o email';
+    final regex = RegExp(
+      r'^[\w\.\+\-]+@[\w\-]+\.[a-z]{2,}$',
+      caseSensitive: false,
+    );
+    if (!regex.hasMatch(v.trim())) return 'Email inválido';
+    return null;
+  }
+
+  String? _validarTelefone(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Preencha o telefone';
+    final digitos = v.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length < 10 || digitos.length > 11) {
+      return 'Telefone deve ter 10 ou 11 dígitos';
     }
-    if (email.isEmpty || !email.contains('@')) {
-      _mostrarErro('Digite um email válido');
-      return false;
+    return null;
+  }
+
+  String? _validarCpfCnpj(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Preencha o CPF ou CNPJ';
+    final digitos = v.replaceAll(RegExp(r'\D'), '');
+    if (digitos.length == 11) {
+      if (!_validarCpf(digitos)) return 'CPF inválido';
+    } else if (digitos.length == 14) {
+      if (!_validarCnpj(digitos)) return 'CNPJ inválido';
+    } else {
+      return 'Digite um CPF (11 dígitos) ou CNPJ (14 dígitos)';
     }
-    if (telefone.isEmpty) {
-      _mostrarErro('Preencha o telefone');
-      return false;
-    }
-    if (cpf.isEmpty) {
-      _mostrarErro('Preencha o CPF');
-      return false;
-    }
-    if (!validarCpf(cpf)) {
-      _mostrarErro('CPF inválido');
-      return false;
-    }
-    if (cep.isEmpty) {
-      _mostrarErro('Preencha o CEP');
-      return false;
-    }
-    if (rua.isEmpty || bairro.isEmpty) {
-      _mostrarErro('Aguarde o preenchimento do endereço pelo CEP');
-      return false;
-    }
-    if (numero.isEmpty) {
-      _mostrarErro('Preencha o número do endereço');
-      return false;
+    return null;
+  }
+
+  bool _validarCpf(String cpf) {
+    if (cpf.length != 11 || cpf == cpf[0] * 11) return false;
+    for (int pos = 9; pos <= 10; pos++) {
+      int soma = 0;
+      for (int i = 0; i < pos; i++) {
+        soma += int.parse(cpf[i]) * (pos + 1 - i);
+      }
+      final digito = (soma * 10 % 11) % 10;
+      if (digito != int.parse(cpf[pos])) return false;
     }
     return true;
   }
 
-  void _irParaEtapaSenha() {
-    if (!_validarDadosPessoais()) return;
-    setState(() => _etapaAtual = 1);
-    _controladorPaginaCelular.animateToPage(
-      1,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOut,
-    );
+  bool _validarCnpj(String cnpj) {
+    if (cnpj.length != 14 || cnpj == cnpj[0] * 14) return false;
+    final p1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    final p2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    for (final entry in [(p1, 12), (p2, 13)]) {
+      final pesos = entry.$1;
+      final pos = entry.$2;
+      int soma = 0;
+      for (int i = 0; i < pos; i++) {
+        soma += int.parse(cnpj[i]) * pesos[i];
+      }
+      final resto = soma % 11;
+      final digito = resto < 2 ? 0 : 11 - resto;
+      if (digito != int.parse(cnpj[pos])) return false;
+    }
+    return true;
   }
 
-  void _irParaEtapaDadosPessoais() {
-    setState(() => _etapaAtual = 0);
-    _controladorPaginaCelular.animateToPage(
-      0,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOut,
-    );
-  }
+  void _continuar() {
+    if (!_formKey.currentState!.validate()) return;
 
-  void _mostrarErro(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensagem), backgroundColor: Colors.redAccent),
-    );
-  }
-
-  Future<void> _criarConta() async {
-    final nome = _controladorNomeCompleto.text.trim();
-    final email = _controladorEmail.text.trim();
-    final senha = _controladorSenha.text;
-    final confirmarSenha = _controladorConfirmarSenha.text;
-
-    if (nome.isEmpty) {
-      _mostrarErro('Nome é obrigatório');
-      return;
-    }
-    if (email.isEmpty || !email.contains('@')) {
-      _mostrarErro('Digite um email válido');
-      return;
-    }
-    if (senha.isEmpty) {
-      _mostrarErro('Digite uma senha');
-      return;
-    }
-    if (senha != confirmarSenha) {
-      _mostrarErro('As senhas não coincidem');
-      return;
-    }
-    if (senha.length < 6) {
-      _mostrarErro('A senha deve ter pelo menos 6 caracteres');
-      return;
-    }
-
-    // Previne duplo clique
-    if (_carregando) return;
-    setState(() => _carregando = true);
-
-    final resultado = await ApiService.cadastrar(
-      nome: nome,
-      email: email,
-      senha: senha,
-      telefone: _controladorTelefone.text.trim(),
-      cpf: _controladorCpf.text.trim(),
-      cep: _controladorCep.text.trim(),
-      rua: _controladorRua.text.trim(),
-      bairro: _controladorBairro.text.trim(),
-      numero: _controladorNumero.text.trim(),
-    );
-
-    if (!mounted) return;
-    setState(() => _carregando = false);
-
-    if (resultado.temErro) {
-      _mostrarErro(resultado.erro!);
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Conta criada com sucesso! Faça login.'),
-        backgroundColor: Colors.green,
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TelaSenhaCadastro(
+          nome: _controladorNome.text.trim(),
+          email: _controladorEmail.text.trim(),
+          telefone: _controladorTelefone.text.trim(),
+          cpfCnpj: _controladorCpfCnpj.text.trim(),
+          cro: _controladorCro.text.trim(),
+        ),
       ),
     );
-    Navigator.of(context).pop();
   }
 
   void _tratarCadastroGoogle() {
@@ -192,309 +127,184 @@ class _EstadoSignupPage extends State<SignupPage> {
   }
 
   @override
-  Widget build(BuildContext contexto) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.fundo,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (contexto, restricoes) {
-            final ehCelular = restricoes.maxWidth < _quebraCelular;
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: ehCelular ? 20 : 24,
-                vertical: 32,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: ehCelular
-                        ? _larguraMaximaCardCelular
-                        : _larguraMaximaCardDesktop,
-                  ),
-                  child: ehCelular
-                      ? _construirCardCelular()
-                      : _construirCardDesktop(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 32),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: _larguraMaxima),
+              child: Container(
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: AppColors.fundoCartao,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.06),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _construirCardDesktop() {
-    return _Card(
-      conteudo: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const SignupHeader(
-            titulo: 'Crie a sua conta no ReOdonto!',
-            subtitulo: 'E facilite sua vida!',
-          ),
-          const SizedBox(height: 28),
-          IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
+                child: Form(
+                  key: _formKey,
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      BasicInfoFields(
-                        controladorTelefone: _controladorTelefone,
-                        controladorNomeCompleto: _controladorNomeCompleto,
-                        controladorEmail: _controladorEmail,
+                      // Botão voltar
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: AppColors.textoEscuro,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+
+                      // Indicador de etapa
+                      _IndicadorEtapa(etapaAtual: 0),
+                      const SizedBox(height: 16),
+
+                      const SignupHeader(
+                        titulo: 'Crie sua conta de dentista',
+                        subtitulo: 'Preencha seus dados para começar.',
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Nome
+                      CampoCadastro(
+                        rotulo: 'Nome completo',
+                        hint: 'Ex: Dr. João Silva',
+                        icone: Icons.person_outline,
+                        controller: _controladorNome,
+                        validator: _validarNome,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'^\s+')),
+                        ],
                       ),
                       const SizedBox(height: 16),
-                      SecurityInfoFields(
-                        controladorSenha: _controladorSenha,
-                        controladorConfirmarSenha: _controladorConfirmarSenha,
-                        ocultarSenha: _ocultarSenha,
-                        ocultarConfirmarSenha: _ocultarConfirmarSenha,
-                        aoAlternarOcultarSenha: () =>
-                            setState(() => _ocultarSenha = !_ocultarSenha),
-                        aoAlternarOcultarConfirmarSenha: () => setState(
-                          () => _ocultarConfirmarSenha = !_ocultarConfirmarSenha,
+
+                      // Email
+                      CampoCadastro(
+                        rotulo: 'Email',
+                        hint: 'seu@email.com',
+                        icone: Icons.email_outlined,
+                        controller: _controladorEmail,
+                        validator: _validarEmail,
+                        tipo: TextInputType.emailAddress,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Telefone com máscara
+                      CampoCadastro(
+                        rotulo: 'Telefone',
+                        hint: '(11) 99999-9999',
+                        icone: Icons.phone_outlined,
+                        controller: _controladorTelefone,
+                        validator: _validarTelefone,
+                        tipo: TextInputType.phone,
+                        inputFormatters: [TelefoneInputFormatter()],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // CPF / CNPJ com máscara automática
+                      CampoCadastro(
+                        rotulo: 'CPF ou CNPJ',
+                        hint: 'Digite CPF (000.000.000-00) ou CNPJ',
+                        icone: Icons.badge_outlined,
+                        controller: _controladorCpfCnpj,
+                        validator: _validarCpfCnpj,
+                        tipo: TextInputType.number,
+                        inputFormatters: [CpfCnpjInputFormatter()],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'O formato é detectado automaticamente ao digitar.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // CRO (opcional)
+                      CampoCadastro(
+                        rotulo: 'CRO (opcional)',
+                        hint: 'Ex: SP-12345',
+                        icone: Icons.workspace_premium_outlined,
+                        controller: _controladorCro,
+                        inputFormatters: [CroInputFormatter()],
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Botão Continuar
+                      ElevatedButton(
+                        onPressed: _continuar,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.azulPrimario,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
                         ),
+                        child: const Text(
+                          'Continuar',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      const _Divisor(),
+                      const SizedBox(height: 18),
+
+                      SignInButton(
+                        Buttons.google,
+                        text: 'Cadastrar com Google',
+                        onPressed: _tratarCadastroGoogle,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 24),
-                Expanded(
-                  child: AddressInfoFields(
-                    controladorCpf: _controladorCpf,
-                    controladorCep: _controladorCep,
-                    controladorRua: _controladorRua,
-                    controladorBairro: _controladorBairro,
-                    controladorNumero: _controladorNumero,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: _carregando ? null : _criarConta,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.azulPrimario,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: _carregando
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text('Criar conta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 18),
-          const _Divisor(),
-          const SizedBox(height: 18),
-          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
-        ],
-      ),
-    );
-  }
-
-  Widget _construirCardCelular() {
-    return _Card(
-      conteudo: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _IndicadorEtapa(etapaAtual: _etapaAtual, totalEtapas: 2),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 560,
-            child: PageView(
-              controller: _controladorPaginaCelular,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (indice) => setState(() => _etapaAtual = indice),
-              children: [
-                _construirEtapaDadosPessoaisCelular(),
-                _construirEtapaSenhaCelular(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _construirEtapaDadosPessoaisCelular() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const SignupHeader(titulo: 'Crie a sua conta no ReOdonto!', subtitulo: 'E facilite sua vida!'),
-          const SizedBox(height: 20),
-          BasicInfoFields(
-            controladorTelefone: _controladorTelefone,
-            controladorNomeCompleto: _controladorNomeCompleto,
-            controladorEmail: _controladorEmail,
-          ),
-          const SizedBox(height: 16),
-          AddressInfoFields(
-            controladorCpf: _controladorCpf,
-            controladorCep: _controladorCep,
-            controladorRua: _controladorRua,
-            controladorBairro: _controladorBairro,
-            controladorNumero: _controladorNumero,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _irParaEtapaSenha,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.azulPrimario,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
             ),
-            child: const Text('Continuar', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           ),
-          const SizedBox(height: 18),
-          const _Divisor(),
-          const SizedBox(height: 18),
-          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
-        ],
+        ),
       ),
-    );
-  }
-
-  Widget _construirEtapaSenhaCelular() {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              IconButton(
-                onPressed: _irParaEtapaDadosPessoais,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textoEscuro),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const SignupHeader(titulo: 'Continue criando sua conta', mostrarLogo: false),
-          const SizedBox(height: 20),
-          SecurityInfoFields(
-            controladorSenha: _controladorSenha,
-            controladorConfirmarSenha: _controladorConfirmarSenha,
-            ocultarSenha: _ocultarSenha,
-            ocultarConfirmarSenha: _ocultarConfirmarSenha,
-            aoAlternarOcultarSenha: () => setState(() => _ocultarSenha = !_ocultarSenha),
-            aoAlternarOcultarConfirmarSenha: () =>
-                setState(() => _ocultarConfirmarSenha = !_ocultarConfirmarSenha),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _carregando ? null : _criarConta,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.azulPrimario,
-              foregroundColor: Colors.white,
-              minimumSize: const Size.fromHeight(52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              elevation: 0,
-            ),
-            child: _carregando
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  )
-                : const Text('Criar conta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
-          const SizedBox(height: 18),
-          const _Divisor(),
-          const SizedBox(height: 18),
-          SignInButton(Buttons.google, text: 'Cadastrar com Google', onPressed: _tratarCadastroGoogle),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Widgets auxiliares
-// ---------------------------------------------------------------------------
-
-class _Card extends StatelessWidget {
-  final Widget conteudo;
-  const _Card({required this.conteudo});
-
-  @override
-  Widget build(BuildContext contexto) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: AppColors.fundoCartao,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: conteudo,
     );
   }
 }
 
 class _IndicadorEtapa extends StatelessWidget {
   final int etapaAtual;
-  final int totalEtapas;
-  const _IndicadorEtapa({required this.etapaAtual, required this.totalEtapas});
+  const _IndicadorEtapa({required this.etapaAtual});
 
   @override
-  Widget build(BuildContext contexto) {
+  Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(totalEtapas, (indice) {
-        final estaAtiva = indice == etapaAtual;
+      children: List.generate(2, (i) {
+        final ativa = i == etapaAtual;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: estaAtiva ? 22 : 8,
+          width: ativa ? 22 : 8,
           height: 6,
           decoration: BoxDecoration(
-            color: estaAtiva ? AppColors.azulPrimario : AppColors.bordaCampo,
+            color: ativa ? AppColors.azulPrimario : const Color(0xFFCBD5E0),
             borderRadius: BorderRadius.circular(4),
           ),
         );

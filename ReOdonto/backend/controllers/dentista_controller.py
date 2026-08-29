@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, create_access_token
 import services.dentista_service as service
 
 dentista_bp = Blueprint('dentista', __name__, url_prefix='/dentistas')
@@ -12,7 +12,33 @@ def _json_ou_erro():
     return data, None
 
 
-# --- Rotas de leitura — requerem login (jwt_required) ---
+@dentista_bp.route('/login', methods=['POST'])
+def login():
+    """POST /dentistas/login  — { "email": "...", "senha": "..." }"""
+    data, erro = _json_ou_erro()
+    if erro:
+        return erro
+
+    email = data.get('email', '').strip()
+    senha = data.get('senha', '')
+    if not email or not senha:
+        return jsonify({'erro': 'Email e senha são obrigatórios'}), 400
+
+    try:
+        dentista = service.login_dentista(email, senha)
+    except ValueError as e:
+        return jsonify({'erro': str(e)}), 401
+
+    token = create_access_token(
+        identity=str(dentista.id),
+        additional_claims={
+            'nome': dentista.nome,
+            'email': dentista.email,
+            'tipo': 'dentista',
+            'dentista_id': dentista.id,
+        },
+    )
+    return jsonify({'token': token, 'dentista': dentista.to_dict()}), 200
 
 @dentista_bp.route('/', methods=['GET'])
 @jwt_required()
@@ -38,7 +64,6 @@ def buscar(id):
 # Por ora, jwt_required já impede acesso sem token.
 
 @dentista_bp.route('/', methods=['POST'])
-@jwt_required()
 def criar():
     data, erro = _json_ou_erro()
     if erro:

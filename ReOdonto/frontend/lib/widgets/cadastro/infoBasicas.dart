@@ -19,14 +19,6 @@ class BasicInfoFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LabeledTextField(
-          rotulo: 'Telefone',
-          textoAjuda: '(DDD) 9XXXX-XXXX',
-          icone: Icons.phone_outlined,
-          controlador: controladorTelefone,
-          tipoTeclado: TextInputType.phone,
-          inputFormatters: [MascaraTelefone()],
-        ),
         const SizedBox(height: 16),
         LabeledTextField(
           rotulo: 'Nome Completo',

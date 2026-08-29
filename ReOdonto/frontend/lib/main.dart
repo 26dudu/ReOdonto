@@ -35,9 +35,10 @@ class MeuApp extends StatelessWidget {
           secondary: const Color.fromARGB(255, 30, 95, 216),
         ),
       ),
-      home: temSessao ? const TelaPerfil() : const TelaLogin(),
+     home: temSessao ? const TelaPerfil() : const TelaLogin(),
+     //home:  const TelaPerfil(),
 
-      // Rotas nomeadas usadas pelo menu (BarraLateralMenu / MenuSanduiche)
+
       // para trocar de tela. Adicione aqui conforme telaMenu.dart e telaAlertas.dart forem implementadas.
       routes: {
         '/perfil': (context) => const TelaPerfil(),

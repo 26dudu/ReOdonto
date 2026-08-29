@@ -4,6 +4,9 @@ import '../services/sessao_usuario.dart';
 import '../services/api_service.dart';
 import '../theme/app_colors.dart';
 import '../widgets/menu_navegacao.dart';
+import '../widgets/secoes_texto.dart';
+import '../widgets/perfil/campos_perfil.dart';
+import '../widgets/perfil/pilula_info.dart';
 import 'telaLogin.dart';
 
 class TelaPerfil extends StatefulWidget {
@@ -17,15 +20,11 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
   late final TextEditingController _controladorTelefone;
   late final TextEditingController _controladorNomeCompleto;
   late final TextEditingController _controladorEmail;
-  late final TextEditingController _controladorCpf;
-  late final TextEditingController _controladorCep;
-  late final TextEditingController _controladorRua;
-  late final TextEditingController _controladorBairro;
-  late final TextEditingController _controladorNumero;
+  late final TextEditingController _controladorCro;
 
-  double _avaliacao = 4.8;
-  int _totalConsultas = 3;
-  final String _tipoConta = 'Paciente';
+  double _avaliacao = 0;
+  int _totalConsultas = 0;
+  final String _tipoConta = 'Dentista';
 
   bool _carregando = true;
   bool _editando = false;
@@ -40,11 +39,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     _controladorTelefone = TextEditingController();
     _controladorNomeCompleto = TextEditingController();
     _controladorEmail = TextEditingController();
-    _controladorCpf = TextEditingController();
-    _controladorCep = TextEditingController();
-    _controladorRua = TextEditingController();
-    _controladorBairro = TextEditingController();
-    _controladorNumero = TextEditingController();
+    _controladorCro = TextEditingController();
 
     _carregarPerfil();
   }
@@ -54,11 +49,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     _controladorTelefone.dispose();
     _controladorNomeCompleto.dispose();
     _controladorEmail.dispose();
-    _controladorCpf.dispose();
-    _controladorCep.dispose();
-    _controladorRua.dispose();
-    _controladorBairro.dispose();
-    _controladorNumero.dispose();
+    _controladorCro.dispose();
     super.dispose();
   }
 
@@ -94,12 +85,8 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       _controladorNomeCompleto.text = dados['nome'] ?? '';
       _controladorEmail.text = dados['email'] ?? '';
       _controladorTelefone.text = dados['telefone'] ?? '';
-      _controladorCpf.text = dados['cpf'] ?? '';
-      _controladorCep.text = dados['cep'] ?? '';
-      _controladorRua.text = dados['rua'] ?? '';
-      _controladorBairro.text = dados['bairro'] ?? '';
-      _controladorNumero.text = dados['numero'] ?? '';
-      
+      _controladorCro.text = dados['cro'] ?? '';
+
       _avaliacao = (dados['avaliacao'] as num?)?.toDouble() ?? 5.0;
       _totalConsultas = (dados['total_consultas'] as num?)?.toInt() ?? 0;
     });
@@ -118,11 +105,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       nome: _controladorNomeCompleto.text.trim(),
       email: _controladorEmail.text.trim(),
       telefone: _controladorTelefone.text.trim(),
-      cpf: _controladorCpf.text.trim(),
-      cep: _controladorCep.text.trim(),
-      rua: _controladorRua.text.trim(),
-      bairro: _controladorBairro.text.trim(),
-      numero: _controladorNumero.text.trim(),
     );
 
     if (!mounted) return;
@@ -181,7 +163,10 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                 (route) => false,
               );
             },
-            child: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
+            child: const Text(
+              'Sair',
+              style: TextStyle(color: Colors.redAccent),
+            ),
           ),
         ],
       ),
@@ -252,12 +237,17 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const _TituloSecao('Seu perfil:'),
+                const TituloSecao('Seu perfil:'),
                 Row(
                   children: [
                     IconButton(
-                      icon: Icon(_editando ? Icons.close : Icons.edit, color: AppColors.azulPrimario),
-                      onPressed: _editando ? _cancelarEdicao : () => setState(() => _editando = true),
+                      icon: Icon(
+                        _editando ? Icons.close : Icons.edit,
+                        color: AppColors.azulPrimario,
+                      ),
+                      onPressed: _editando
+                          ? _cancelarEdicao
+                          : () => setState(() => _editando = true),
                     ),
                     IconButton(
                       icon: const Icon(Icons.logout, color: Colors.redAccent),
@@ -271,7 +261,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
             Row(
               children: [
                 Expanded(
-                  child: _PilulaInfo(
+                  child: PilulaInfo(
                     rotulo: 'Avaliação:',
                     valor: '${_avaliacao.toStringAsFixed(1)} ★',
                     rotuloClicavel: true,
@@ -279,7 +269,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: _PilulaInfo(
+                  child: PilulaInfo(
                     rotulo: 'Consultas:',
                     valor: '$_totalConsultas',
                   ),
@@ -287,54 +277,30 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
               ],
             ),
             const SizedBox(height: 28),
-            const _TituloSecao('Dados Pessoais:'),
+            const TituloSecao('Dados Pessoais:'),
             const SizedBox(height: 12),
-            _CampoPerfil(
+            CampoPerfil(
               rotulo: 'Nome Completo:',
               controlador: _controladorNomeCompleto,
               somenteLeitura: !_editando,
             ),
             const SizedBox(height: 14),
-            _CampoPerfil(
+            CampoPerfil(
               rotulo: 'Email:',
               controlador: _controladorEmail,
               somenteLeitura: !_editando,
             ),
             const SizedBox(height: 14),
-            _CampoPerfil(
+            CampoPerfil(
               rotulo: 'Telefone:',
               controlador: _controladorTelefone,
               somenteLeitura: !_editando,
             ),
             const SizedBox(height: 14),
-            _CampoPerfil(
-              rotulo: 'CPF:',
-              controlador: _controladorCpf,
-              somenteLeitura: !_editando,
-            ),
-            const SizedBox(height: 14),
-            _CampoPerfil(
-              rotulo: 'Cep:',
-              controlador: _controladorCep,
-              somenteLeitura: !_editando,
-            ),
-            const SizedBox(height: 14),
-            _CampoPerfil(
-              rotulo: 'Rua:',
-              controlador: _controladorRua,
-              somenteLeitura: true,
-            ),
-            const SizedBox(height: 14),
-            _CampoPerfil(
-              rotulo: 'Bairro:',
-              controlador: _controladorBairro,
-              somenteLeitura: true,
-            ),
-            const SizedBox(height: 14),
-            _CampoPerfil(
-              rotulo: 'Número:',
-              controlador: _controladorNumero,
-              somenteLeitura: !_editando,
+            CampoPerfil(
+              rotulo: 'CRO:',
+              controlador: _controladorCro,
+              somenteLeitura: true, // CRO não é editável após cadastro
             ),
             const SizedBox(height: 24),
             if (_editando) ...[
@@ -343,17 +309,25 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azulPrimario,
                   minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: _salvando
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
                       )
                     : const Text(
                         'Salvar Alterações',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
               ),
               const SizedBox(height: 12),
@@ -361,7 +335,9 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                 onPressed: _cancelarEdicao,
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: const Text('Cancelar'),
               ),
@@ -402,7 +378,9 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                           OutlinedButton.icon(
                             icon: Icon(_editando ? Icons.close : Icons.edit),
                             label: Text(_editando ? 'Cancelar' : 'Editar'),
-                            onPressed: _editando ? _cancelarEdicao : () => setState(() => _editando = true),
+                            onPressed: _editando
+                                ? _cancelarEdicao
+                                : () => setState(() => _editando = true),
                           ),
                           const SizedBox(width: 12),
                           ElevatedButton.icon(
@@ -454,13 +432,13 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                 else if (_erro != null)
                   _construirErroWidget()
                 else ...[
-                  const _TituloSecao('Sua avaliação:'),
+                  const TituloSecao('Sua avaliação:'),
                   const SizedBox(height: 10),
                   Row(
                     children: [
                       SizedBox(
                         width: 160,
-                        child: _PilulaInfo(
+                        child: PilulaInfo(
                           rotulo: 'Avaliação:',
                           valor: '${_avaliacao.toStringAsFixed(1)} ★',
                         ),
@@ -468,7 +446,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                       const SizedBox(width: 16),
                       SizedBox(
                         width: 160,
-                        child: _PilulaInfo(
+                        child: PilulaInfo(
                           rotulo: 'Consultas:',
                           valor: '$_totalConsultas',
                         ),
@@ -476,7 +454,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                     ],
                   ),
                   const SizedBox(height: 28),
-                  const _TituloSecao('Dados Pessoais:'),
+                  const TituloSecao('Dados Pessoais:'),
                   const SizedBox(height: 14),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -485,69 +463,38 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _CampoPerfil(
+                            CampoPerfil(
                               rotulo: 'Nome Completo:',
                               controlador: _controladorNomeCompleto,
                               somenteLeitura: !_editando,
                             ),
                             const SizedBox(height: 14),
-                            _CampoPerfil(
+                            CampoPerfil(
                               rotulo: 'Email:',
                               controlador: _controladorEmail,
                               somenteLeitura: !_editando,
                             ),
-                            const SizedBox(height: 14),
-                            _CampoPerfil(
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CampoPerfil(
                               rotulo: 'Telefone:',
                               controlador: _controladorTelefone,
                               somenteLeitura: !_editando,
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _CampoPerfil(
-                              rotulo: 'CPF:',
-                              controlador: _controladorCpf,
-                              somenteLeitura: !_editando,
-                            ),
                             const SizedBox(height: 14),
-                            _CampoPerfil(
-                              rotulo: 'Cep:',
-                              controlador: _controladorCep,
-                              somenteLeitura: !_editando,
-                            ),
-                            const SizedBox(height: 14),
-                            _CampoPerfil(
-                              rotulo: 'Rua:',
-                              controlador: _controladorRua,
-                              somenteLeitura: true,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _CampoPerfil(
-                              rotulo: 'Bairro:',
-                              controlador: _controladorBairro,
+                            CampoPerfil(
+                              rotulo: 'CRO:',
+                              controlador: _controladorCro,
                               somenteLeitura: true,
                             ),
                             const SizedBox(height: 14),
-                            _CampoPerfil(
-                              rotulo: 'Número:',
-                              controlador: _controladorNumero,
-                              somenteLeitura: !_editando,
-                            ),
-                            const SizedBox(height: 14),
-                            _CampoEstatico(
+                            CampoEstatico(
                               rotulo: 'Tipo de conta:',
                               valor: _tipoConta,
                               corValor: AppColors.azulPrimario,
@@ -566,7 +513,10 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                         OutlinedButton(
                           onPressed: _cancelarEdicao,
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 16,
+                            ),
                           ),
                           child: const Text('Cancelar'),
                         ),
@@ -575,17 +525,26 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
                           onPressed: _salvando ? null : _salvarPerfil,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.azulPrimario,
-                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 16,
+                            ),
                           ),
                           child: _salvando
                               ? const SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Text(
                                   'Salvar Alterações',
-                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                         ),
                       ],
@@ -615,178 +574,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _TituloSecao extends StatelessWidget {
-  final String texto;
-  const _TituloSecao(this.texto);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      texto,
-      style: const TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textoEscuro,
-      ),
-    );
-  }
-}
-
-class _PilulaInfo extends StatelessWidget {
-  final String rotulo;
-  final String valor;
-  final bool rotuloClicavel;
-
-  const _PilulaInfo({
-    required this.rotulo,
-    required this.valor,
-    this.rotuloClicavel = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          rotulo,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: rotuloClicavel ? AppColors.azulPrimario : AppColors.textoCinza,
-            decoration: rotuloClicavel ? TextDecoration.underline : TextDecoration.none,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-          decoration: BoxDecoration(
-            color: AppColors.preenchimentoCampo,
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AppColors.bordaCampo),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            valor,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textoEscuro,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CampoPerfil extends StatelessWidget {
-  final String rotulo;
-  final TextEditingController controlador;
-  final bool somenteLeitura;
-
-  const _CampoPerfil({
-    required this.rotulo,
-    required this.controlador,
-    this.somenteLeitura = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          rotulo,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textoCinza,
-          ),
-        ),
-        const SizedBox(height: 6),
-        TextField(
-          controller: controlador,
-          readOnly: somenteLeitura,
-          style: TextStyle(
-            fontSize: 13,
-            color: somenteLeitura ? AppColors.textoCinza : AppColors.textoEscuro,
-          ),
-          decoration: InputDecoration(
-            isDense: true,
-            filled: true,
-            fillColor: somenteLeitura ? AppColors.bordaCampo : AppColors.fundoCartao,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 12,
-              horizontal: 12,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.bordaCampo),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.bordaCampo),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: AppColors.azulPrimario),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CampoEstatico extends StatelessWidget {
-  final String rotulo;
-  final String valor;
-  final Color? corValor;
-
-  const _CampoEstatico({
-    required this.rotulo,
-    required this.valor,
-    this.corValor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          rotulo,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textoCinza,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-          decoration: BoxDecoration(
-            color: AppColors.fundoCartao,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.bordaCampo),
-          ),
-          child: Text(
-            valor,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: corValor ?? AppColors.textoEscuro,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

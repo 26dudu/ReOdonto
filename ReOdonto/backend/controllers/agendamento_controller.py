@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 import services.agendamento_service as service
 
 agendamento_bp = Blueprint('agendamento', __name__, url_prefix='/agendamentos')
@@ -12,6 +12,18 @@ def _json_ou_erro():
     return data, None
 
 
+def _dentista_id_do_token():
+    """
+    Extrai dentista_id do JWT.
+    O token pode ter sido criado com identity = dentista_id (int)
+    ou pode ter o claim extra 'dentista_id'.
+    """
+    claims = get_jwt()
+    if 'dentista_id' in claims:
+        return int(claims['dentista_id'])
+    return int(get_jwt_identity())
+
+
 @agendamento_bp.route('/', methods=['POST'])
 @jwt_required()
 def criar():
@@ -19,9 +31,8 @@ def criar():
     if erro:
         return erro
 
-    # Garante que o paciente só cria agendamento para si mesmo
-    paciente_logado = int(get_jwt_identity())
-    data['paciente_id'] = paciente_logado
+    # Usa dentista_id do token (dentista logado só cria para si mesmo)
+    data['dentista_id'] = _dentista_id_do_token()
 
     try:
         agendamento = service.criar_agendamento(data)
@@ -34,25 +45,11 @@ def criar():
 @jwt_required()
 def listar():
     """
-    GET /agendamentos/?paciente_id=3
-    GET /agendamentos/?dentista_id=2
-    O paciente logado só pode ver seus próprios agendamentos.
+    GET /agendamentos/
+    Retorna todos os agendamentos do dentista logado.
     """
-    paciente_logado = int(get_jwt_identity())
-    paciente_id = request.args.get('paciente_id', type=int)
-    dentista_id = request.args.get('dentista_id', type=int)
-
-    # Paciente não pode ver agendamentos de outros
-    if paciente_id and paciente_id != paciente_logado:
-        return jsonify({'erro': 'Acesso negado'}), 403
-
-    if not paciente_id and not dentista_id:
-        paciente_id = paciente_logado  # padrão: listar os próprios
-
-    agendamentos = service.listar_agendamentos(
-        paciente_id=paciente_id,
-        dentista_id=dentista_id,
-    )
+    dentista_id = _dentista_id_do_token()
+    agendamentos = service.listar_agendamentos(dentista_id=dentista_id)
     return jsonify([a.to_dict_completo() for a in agendamentos])
 
 
@@ -60,8 +57,8 @@ def listar():
 @jwt_required()
 def buscar(id):
     agendamento = service.buscar_agendamento(id)
-    paciente_logado = int(get_jwt_identity())
-    if agendamento.paciente_id != paciente_logado:
+    dentista_id = _dentista_id_do_token()
+    if agendamento.dentista_id != dentista_id:
         return jsonify({'erro': 'Acesso negado'}), 403
     return jsonify(agendamento.to_dict_completo())
 
@@ -75,8 +72,8 @@ def atualizar_status(id):
         return erro
 
     agendamento = service.buscar_agendamento(id)
-    paciente_logado = int(get_jwt_identity())
-    if agendamento.paciente_id != paciente_logado:
+    dentista_id = _dentista_id_do_token()
+    if agendamento.dentista_id != dentista_id:
         return jsonify({'erro': 'Acesso negado'}), 403
 
     novo_status = data.get('status')
@@ -90,12 +87,40 @@ def atualizar_status(id):
         return jsonify({'erro': str(e)}), 400
 
 
+@agendamento_bp.route('/<int:id>/paciente-rapido', methods=['PATCH'])
+@jwt_required()
+def preencher_paciente(id):
+    """
+    Preenche nome e telefone de um horário vago (walk-in).
+    Body: { "nome": "João Silva", "telefone": "31999999999" }
+    """
+    data, erro = _json_ou_erro()
+    if erro:
+        return erro
+
+    agendamento = service.buscar_agendamento(id)
+    dentista_id = _dentista_id_do_token()
+    if agendamento.dentista_id != dentista_id:
+        return jsonify({'erro': 'Acesso negado'}), 403
+
+    nome = data.get('nome', '').strip()
+    telefone = data.get('telefone', '').strip()
+    if not nome:
+        return jsonify({'erro': 'Campo nome é obrigatório'}), 400
+
+    try:
+        agendamento = service.preencher_paciente(id, nome, telefone)
+        return jsonify(agendamento.to_dict_completo())
+    except ValueError as e:
+        return jsonify({'erro': str(e)}), 400
+
+
 @agendamento_bp.route('/<int:id>', methods=['DELETE'])
 @jwt_required()
 def deletar(id):
     agendamento = service.buscar_agendamento(id)
-    paciente_logado = int(get_jwt_identity())
-    if agendamento.paciente_id != paciente_logado:
+    dentista_id = _dentista_id_do_token()
+    if agendamento.dentista_id != dentista_id:
         return jsonify({'erro': 'Acesso negado'}), 403
     service.deletar_agendamento(id)
     return '', 204

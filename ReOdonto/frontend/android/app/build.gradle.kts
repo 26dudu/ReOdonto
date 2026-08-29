@@ -28,6 +28,12 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Google Sign-In Configuration
+        // Atualize SEU_CLIENT_ID com o valor real do Google Console
+        manifestPlaceholders = mapOf(
+            "googleSignInClientId" to "257323228205-sc45fgcp8aakbd4rocnovlm0n4li7d00.apps.googleusercontent.com"
+        )
     }
 
     buildTypes {
@@ -41,4 +47,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Google Play Services para Google Sign-In
+    implementation("com.google.android.gms:play-services-auth:20.7.0")
 }

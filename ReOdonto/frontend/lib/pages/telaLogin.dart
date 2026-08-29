@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:sign_in_button/sign_in_button.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 import '../services/api_service.dart';
 import '../services/sessao_usuario.dart';
+import '../widgets/botao_google_login.dart';
 import 'telaCadastro.dart';
 
 class TelaLogin extends StatefulWidget {
@@ -44,7 +44,14 @@ class _TelaLoginState extends State<TelaLogin> {
 
     setState(() => _carregando = true);
 
-    final resultado = await ApiService.login(email: email, senha: senha);
+    // Tenta login como dentista primeiro, depois como paciente
+    ApiResultado<Map<String, dynamic>> resultado =
+        await ApiService.loginDentista(email: email, senha: senha);
+
+    if (resultado.temErro) {
+      // Não era dentista — tenta como paciente
+      resultado = await ApiService.login(email: email, senha: senha);
+    }
 
     if (!mounted) return;
     setState(() => _carregando = false);
@@ -58,7 +65,9 @@ class _TelaLoginState extends State<TelaLogin> {
 
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacementNamed('/perfil');
+    
+    final rota = SessaoUsuario.ehDentista ? '/agenda' : '/perfil';
+    Navigator.of(context).pushReplacementNamed(rota);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Bem-vindo, ${SessaoUsuario.nome}!')),
@@ -365,10 +374,15 @@ class _TelaLoginState extends State<TelaLogin> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      SignInButton(
-                        Buttons.google,
-                        text: 'Entrar com Google',
-                        onPressed: () {},
+                      BotaoGoogleLogin(
+                        onLoginSucesso: () {
+                          if (mounted) {
+                            Navigator.of(context).pushReplacementNamed('/perfil');
+                          }
+                        },
+                        onLoginErro: () {
+                          // Erro já foi mostrado no widget
+                        },
                       ),
                     ],
                   ),

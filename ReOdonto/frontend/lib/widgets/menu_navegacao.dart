@@ -9,7 +9,7 @@ class _ItemMenuInfo {
   final PaginaApp pagina;
   final IconData icone;
   final String texto;
-  final String? rota; // null = tela ainda não implementada
+  final String? rota;
 
   const _ItemMenuInfo({
     required this.pagina,
@@ -30,7 +30,7 @@ const List<_ItemMenuInfo> _itensMenu = [
     pagina: PaginaApp.menu, 
     icone: Icons.home_outlined,
      texto: 'Menu'),
-     // sem rota: telaMenu.dart ainda está vazia
+    
   _ItemMenuInfo(
       pagina: PaginaApp.agenda,
       icone: Icons.calendar_today_outlined,
@@ -40,14 +40,10 @@ const List<_ItemMenuInfo> _itensMenu = [
       pagina: PaginaApp.alertas,
       icone: Icons.notifications_none_outlined,
       texto: 'Alertas'),
-      // sem rota: telaAlertas.dart ainda está vazia
+      
 ];
 
-/// Navega para a página do item de menu tocado.
-/// - Se já estivermos nessa página, não faz nada (evita empilhar a mesma tela).
-/// - Se a rota ainda não existir (telas em construção), avisa com um SnackBar.
-/// - Caso contrário, troca de tela com pushReplacementNamed — sem empilhar
-///   histórico, já que Perfil/Agenda/Menu/Alertas são "abas" do mesmo nível.
+
 void _navegarParaItem(
   BuildContext context,
   _ItemMenuInfo item,

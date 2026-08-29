@@ -11,6 +11,7 @@ from controllers.clinica_controller import clinica_bp
 from controllers.consulta_controller import consulta_bp
 from controllers.agendamento_controller import agendamento_bp
 from controllers.cep_controller import cep_bp
+from controllers.google_auth_controller import google_auth_bp
 
 # Carrega variáveis do arquivo .env se existir (python-dotenv opcional)
 try:
@@ -94,6 +95,7 @@ app.register_blueprint(clinica_bp)
 app.register_blueprint(consulta_bp)
 app.register_blueprint(agendamento_bp)
 app.register_blueprint(cep_bp)
+app.register_blueprint(google_auth_bp)
 
 # --- Criar tabelas ---
 with app.app_context():

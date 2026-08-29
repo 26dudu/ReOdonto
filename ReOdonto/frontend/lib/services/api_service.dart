@@ -33,39 +33,25 @@ Map<String, String> get _headersAuth {
 class ApiResultado<T> {
   final T? dados;
   final String? erro;
-  final bool sessaoExpirada; // true quando o backend retorna 401
 
-  const ApiResultado.sucesso(this.dados)
-      : erro = null,
-        sessaoExpirada = false;
-
-  const ApiResultado.falha(this.erro, {this.sessaoExpirada = false})
-      : dados = null;
+  const ApiResultado.sucesso(this.dados) : erro = null;
+  const ApiResultado.falha(this.erro) : dados = null;
 
   bool get temErro => erro != null;
 }
 
-/// Verifica se a resposta é 401 e retorna o resultado adequado.
-ApiResultado<T> _tratarResposta401<T>(http.Response response, T dados) {
-  if (response.statusCode == 401) {
-    final body = jsonDecode(response.body) as Map<String, dynamic>;
-    return ApiResultado.falha(
-      body['erro'] ?? 'Sessão expirada. Faça login novamente.',
-      sessaoExpirada: true,
-    );
-  }
-  return ApiResultado.sucesso(dados);
-}
-
 class ApiService {
   // ----------------------------------------------------------------
-  // CADASTRO — POST /pacientes/
+  // CADASTRO DENTISTA — POST /dentistas/
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> cadastrar({
     required String nome,
     required String email,
     required String senha,
     String? telefone,
+    String? cpfCnpj,
+    String? cro,
+    // Campos legados (ignorados no cadastro de dentista)
     String? cpf,
     String? cep,
     String? rua,
@@ -75,18 +61,15 @@ class ApiService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/pacientes/'),
+            Uri.parse('$_baseUrl/dentistas/'),
             headers: _headersPublicos,
             body: jsonEncode({
               'nome': nome,
               'email': email,
               'senha': senha,
               if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
-              if (cpf != null && cpf.isNotEmpty) 'cpf': cpf,
-              if (cep != null && cep.isNotEmpty) 'cep': cep,
-              if (rua != null && rua.isNotEmpty) 'rua': rua,
-              if (bairro != null && bairro.isNotEmpty) 'bairro': bairro,
-              if (numero != null && numero.isNotEmpty) 'numero': numero,
+              if (cpfCnpj != null && cpfCnpj.isNotEmpty) 'cpf_cnpj': cpfCnpj,
+              if (cro != null && cro.isNotEmpty) 'cro': cro,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -94,6 +77,36 @@ class ApiService {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 201) return ApiResultado.sucesso(body);
       return ApiResultado.falha(body['erro'] ?? 'Erro ao criar conta');
+    } on SocketException {
+      return const ApiResultado.falha(
+          'Sem conexão com o servidor. Verifique se o backend está rodando.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // LOGIN DENTISTA — POST /dentistas/login
+  // Retorna { token, dentista }
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> loginDentista({
+    required String email,
+    required String senha,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/dentistas/login'),
+            headers: _headersPublicos,
+            body: jsonEncode({'email': email, 'senha': senha}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Email ou senha inválidos');
     } on SocketException {
       return const ApiResultado.falha(
           'Sem conexão com o servidor. Verifique se o backend está rodando.');
@@ -220,12 +233,22 @@ class ApiService {
 
   // ----------------------------------------------------------------
   // CRIAR AGENDAMENTO — POST /agendamentos/
+  // O app é usado só pelo dentista, então quem chega aqui é sempre um
+  // paciente sem conta (nome + telefone), tipo de consulta e data/hora.
+  //
+  // TODO(backend): `clinicaId` ficou opcional porque ainda não existe
+  // vínculo dentista→clínica no backend. Assim que existir, o ideal é o
+  // backend inferir a clínica a partir do `dentistaId` (ou do token JWT)
+  // em vez do app precisar informar.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> criarAgendamento({
     required int dentistaId,
-    required int consultaId,
-    required int clinicaId,
+    int? consultaId,
     required String dataHora, // ISO 8601: "2025-08-15T14:00:00"
+    required String nomePaciente,
+    required String telefonePaciente,
+    int? clinicaId,
+    String? consultaCustomizada,
   }) async {
     try {
       final response = await http
@@ -234,9 +257,12 @@ class ApiService {
             headers: _headersAuth,
             body: jsonEncode({
               'dentista_id': dentistaId,
-              'consulta_id': consultaId,
-              'clinica_id': clinicaId,
+              if (consultaId != null) 'consulta_id': consultaId,
               'data_hora': dataHora,
+              'nome_paciente': nomePaciente,
+              'telefone_paciente': telefonePaciente,
+              if (clinicaId != null) 'clinica_id': clinicaId,
+              if (consultaCustomizada != null) 'consulta_customizada': consultaCustomizada,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -276,66 +302,100 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // BUSCAR PERFIL — GET /pacientes/<id>
+  // AGENDAR PACIENTE WALK-IN — PATCH /agendamentos/<id>/paciente-rapido
+  // Preenche um horário vago com nome + telefone de um paciente que
+  // chegou direto na clínica (ex: idosos que não usam o WhatsApp/app).
+  // Não é um cadastro completo — só o suficiente pra identificar quem
+  // vai ser atendido naquele horário.
+  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
   // ----------------------------------------------------------------
-  static Future<ApiResultado<Map<String, dynamic>>> buscarPerfil(int id) async {
+  static Future<ApiResultado<Map<String, dynamic>>> agendarPacienteRapido({
+    required int agendamentoId,
+    required String nome,
+    required String telefone,
+  }) async {
     try {
       final response = await http
-          .get(
-            Uri.parse('$_baseUrl/pacientes/$id'),
+          .patch(
+            Uri.parse('$_baseUrl/agendamentos/$agendamentoId/paciente-rapido'),
             headers: _headersAuth,
+            body: jsonEncode({'nome': nome, 'telefone': telefone}),
           )
           .timeout(const Duration(seconds: 10));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) return ApiResultado.sucesso(body);
-      return ApiResultado.falha(body['erro'] ?? 'Erro ao buscar perfil');
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao agendar paciente');
     } on SocketException {
       return const ApiResultado.falha('Sem conexão com o servidor.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
     } catch (e) {
       return ApiResultado.falha('Erro inesperado: $e');
     }
   }
 
   // ----------------------------------------------------------------
-  // ATUALIZAR PERFIL — PUT /pacientes/<id>
+  // ESQUECI MINHA SENHA — POST /pacientes/recuperar-senha
+  // Envia (ou reenvia) o código de verificação para o email informado.
+  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
   // ----------------------------------------------------------------
-  static Future<ApiResultado<Map<String, dynamic>>> atualizarPerfil(
-    int id, {
-    required String nome,
-    String? email,
-    String? telefone,
-    String? cpf,
-    String? cep,
-    String? rua,
-    String? bairro,
-    String? numero,
-    String? senha,
+  static Future<ApiResultado<Map<String, dynamic>>> solicitarCodigoRecuperacao({
+    required String email,
   }) async {
     try {
       final response = await http
-          .put(
-            Uri.parse('$_baseUrl/pacientes/$id'),
-            headers: _headersAuth,
+          .post(
+            Uri.parse('$_baseUrl/pacientes/recuperar-senha'),
+            headers: _headersPublicos,
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao enviar o código');
+    } on SocketException {
+      return const ApiResultado.falha(
+          'Sem conexão com o servidor. Verifique se o backend está rodando.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // REDEFINIR SENHA — POST /pacientes/redefinir-senha
+  // Confirma o código recebido por email e define a nova senha.
+  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> redefinirSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/pacientes/redefinir-senha'),
+            headers: _headersPublicos,
             body: jsonEncode({
-              'nome': nome,
-              if (email != null && email.isNotEmpty) 'email': email,
-              if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
-              if (cpf != null && cpf.isNotEmpty) 'cpf': cpf,
-              if (cep != null && cep.isNotEmpty) 'cep': cep,
-              if (rua != null && rua.isNotEmpty) 'rua': rua,
-              if (bairro != null && bairro.isNotEmpty) 'bairro': bairro,
-              if (numero != null && numero.isNotEmpty) 'numero': numero,
-              if (senha != null && senha.isNotEmpty) 'senha': senha,
+              'email': email,
+              'codigo': codigo,
+              'nova_senha': novaSenha,
             }),
           )
           .timeout(const Duration(seconds: 10));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) return ApiResultado.sucesso(body);
-      return ApiResultado.falha(body['erro'] ?? 'Erro ao atualizar perfil');
+      return ApiResultado.falha(body['erro'] ?? 'Código inválido ou expirado');
     } on SocketException {
-      return const ApiResultado.falha('Sem conexão com o servidor.');
+      return const ApiResultado.falha(
+          'Sem conexão com o servidor. Verifique se o backend está rodando.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
     } catch (e) {
       return ApiResultado.falha('Erro inesperado: $e');
     }
@@ -387,6 +447,66 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
+  // BUSCAR PERFIL DENTISTA — GET /dentistas/<id>
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> buscarPerfil(int id) async {
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/dentistas/$id'),
+            headers: _headersAuth,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao buscar perfil');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // ATUALIZAR PERFIL DENTISTA — PUT /dentistas/<id>
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> atualizarPerfil(
+    int id, {
+    required String nome,
+    String? email,
+    String? telefone,
+    String? cpf,
+    String? cep,
+    String? rua,
+    String? bairro,
+    String? numero,
+    String? senha,
+  }) async {
+    try {
+      final response = await http
+          .put(
+            Uri.parse('$_baseUrl/dentistas/$id'),
+            headers: _headersAuth,
+            body: jsonEncode({
+              'nome': nome,
+              if (email != null && email.isNotEmpty) 'email': email,
+              if (telefone != null && telefone.isNotEmpty) 'telefone': telefone,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao atualizar perfil');
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
   // DELETAR PERFIL — DELETE /pacientes/<id>
   // ----------------------------------------------------------------
   static Future<ApiResultado<void>> deletarConta(int id) async {
@@ -408,4 +528,3 @@ class ApiService {
     }
   }
 }
-

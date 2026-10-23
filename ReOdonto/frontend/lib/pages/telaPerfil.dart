@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../services/sessao_usuario.dart';
 import '../services/api_service.dart';
+import '../services/sessao_usuario.dart';
 import '../theme/app_colors.dart';
+import '../utils/avisos.dart';
 import '../widgets/menu_navegacao.dart';
-import '../widgets/secoes_texto.dart';
+import '../widgets/pagina_com_menu.dart';
 import '../widgets/perfil/campos_perfil.dart';
+import '../widgets/perfil/grade_campos.dart';
 import '../widgets/perfil/pilula_info.dart';
+import '../widgets/secoes_texto.dart';
 import 'telaLogin.dart';
 
 class TelaPerfil extends StatefulWidget {
@@ -17,39 +19,30 @@ class TelaPerfil extends StatefulWidget {
 }
 
 class _EstadoTelaPerfil extends State<TelaPerfil> {
-  late final TextEditingController _controladorTelefone;
-  late final TextEditingController _controladorNomeCompleto;
-  late final TextEditingController _controladorEmail;
-  late final TextEditingController _controladorCro;
+  final _nome = TextEditingController();
+  final _email = TextEditingController();
+  final _telefone = TextEditingController();
+  final _cro = TextEditingController();
 
   double _avaliacao = 0;
   int _totalConsultas = 0;
-  final String _tipoConta = 'Dentista';
 
   bool _carregando = true;
   bool _editando = false;
   bool _salvando = false;
   String? _erro;
 
-  static const double _quebraCelular = 700;
-
   @override
   void initState() {
     super.initState();
-    _controladorTelefone = TextEditingController();
-    _controladorNomeCompleto = TextEditingController();
-    _controladorEmail = TextEditingController();
-    _controladorCro = TextEditingController();
-
     _carregarPerfil();
   }
 
   @override
   void dispose() {
-    _controladorTelefone.dispose();
-    _controladorNomeCompleto.dispose();
-    _controladorEmail.dispose();
-    _controladorCro.dispose();
+    for (final c in [_nome, _email, _telefone, _cro]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -57,7 +50,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     if (SessaoUsuario.id == null) {
       setState(() {
         _carregando = false;
-        _erro = "Sessão inválida. Faça login novamente.";
+        _erro = 'Sessão inválida. Faça login novamente.';
       });
       return;
     }
@@ -68,7 +61,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     });
 
     final resultado = await ApiService.buscarPerfil(SessaoUsuario.id!);
-
     if (!mounted) return;
 
     if (resultado.temErro) {
@@ -82,59 +74,44 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     final dados = resultado.dados!;
     setState(() {
       _carregando = false;
-      _controladorNomeCompleto.text = dados['nome'] ?? '';
-      _controladorEmail.text = dados['email'] ?? '';
-      _controladorTelefone.text = dados['telefone'] ?? '';
-      _controladorCro.text = dados['cro'] ?? '';
-
+      _nome.text = dados['nome'] ?? '';
+      _email.text = dados['email'] ?? '';
+      _telefone.text = dados['telefone'] ?? '';
+      _cro.text = dados['cro'] ?? '';
       _avaliacao = (dados['avaliacao'] as num?)?.toDouble() ?? 5.0;
       _totalConsultas = (dados['total_consultas'] as num?)?.toInt() ?? 0;
     });
   }
 
   Future<void> _salvarPerfil() async {
-    if (_controladorNomeCompleto.text.trim().isEmpty) {
-      _mostrarErro('Nome não pode ser vazio');
-      return;
+    if (_nome.text.trim().isEmpty) {
+      return mostrarAviso(context, 'Nome não pode ser vazio', erro: true);
     }
 
     setState(() => _salvando = true);
 
     final resultado = await ApiService.atualizarPerfil(
       SessaoUsuario.id!,
-      nome: _controladorNomeCompleto.text.trim(),
-      email: _controladorEmail.text.trim(),
-      telefone: _controladorTelefone.text.trim(),
+      nome: _nome.text.trim(),
+      email: _email.text.trim(),
+      telefone: _telefone.text.trim(),
     );
-
     if (!mounted) return;
     setState(() => _salvando = false);
 
     if (resultado.temErro) {
-      _mostrarErro(resultado.erro!);
-      return;
+      return mostrarAviso(context, resultado.erro!, erro: true);
     }
 
-    // Update session locally
+    // Atualiza a sessão local.
     await SessaoUsuario.salvar({
       'paciente': resultado.dados,
       'token': SessaoUsuario.token,
     });
+    if (!mounted) return;
 
     setState(() => _editando = false);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Perfil atualizado com sucesso!'),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
-  void _mostrarErro(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent),
-    );
+    mostrarAviso(context, 'Perfil atualizado com sucesso!', sucesso: true);
   }
 
   void _cancelarEdicao() {
@@ -142,438 +119,188 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     _carregarPerfil();
   }
 
+  void _alternarEdicao() =>
+      _editando ? _cancelarEdicao() : setState(() => _editando = true);
+
   Future<void> _logout() async {
-    showDialog(
+    final sair = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Confirmar Logout'),
         content: const Text('Tem certeza que deseja sair de sua conta?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () => Navigator.pop(ctx, false),
             child: const Text('Cancelar'),
           ),
           TextButton(
-            onPressed: () async {
-              await SessaoUsuario.limpar();
-              if (!mounted) return;
-              Navigator.pop(ctx);
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const TelaLogin()),
-                (route) => false,
-              );
-            },
-            child: const Text(
-              'Sair',
-              style: TextStyle(color: Colors.redAccent),
-            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
+    );
+    if (sair != true) return;
+
+    await SessaoUsuario.limpar();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const TelaLogin()),
+      (_) => false,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.fundo,
-      drawer: const MenuSanduiche(paginaAtiva: PaginaApp.perfil),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, restricoes) {
-            final ehCelular = restricoes.maxWidth < _quebraCelular;
-            return ehCelular
-                ? _construirLayoutCelular()
-                : _construirLayoutDesktop();
-          },
+    final pronto = !_carregando && _erro == null;
+
+    return PaginaComMenu(
+      pagina: PaginaApp.perfil,
+      carregando: _carregando,
+      erro: _erro,
+      onTentarNovamente: _carregarPerfil,
+      // Desktop: título + botões no cabeçalho (o celular os põe no corpo).
+      tituloDesktop: Text(
+        _nome.text.isEmpty ? 'Meu Perfil' : _nome.text,
+        style: const TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w800,
+          color: AppColors.textoEscuro,
         ),
       ),
-    );
-  }
-
-  Widget _construirLayoutCelular() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const BotaoMenuSanduiche(),
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFD0E2FF), width: 2),
-                ),
-                child: Center(
-                  child: SvgPicture.asset(
-                    'assets/icons/tooth-svgrepo-com.svg',
-                    width: 32,
-                    height: 32,
-                    colorFilter: const ColorFilter.mode(
-                      AppColors.azulPrimario,
-                      BlendMode.srcIn,
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      acoesDesktop: [
+        if (pronto) ...[
+          OutlinedButton.icon(
+            icon: Icon(_editando ? Icons.close : Icons.edit),
+            label: Text(_editando ? 'Cancelar' : 'Editar'),
+            onPressed: _alternarEdicao,
           ),
-          const SizedBox(height: 24),
-          if (_carregando)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32.0),
-                child: CircularProgressIndicator(),
-              ),
-            )
-          else if (_erro != null)
-            _construirErroWidget()
-          else ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const TituloSecao('Seu perfil:'),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        _editando ? Icons.close : Icons.edit,
-                        color: AppColors.azulPrimario,
-                      ),
-                      onPressed: _editando
-                          ? _cancelarEdicao
-                          : () => setState(() => _editando = true),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.logout, color: Colors.redAccent),
-                      onPressed: _logout,
-                    ),
-                  ],
-                ),
-              ],
+          const SizedBox(width: 12),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.logout),
+            label: const Text('Sair'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: PilulaInfo(
-                    rotulo: 'Avaliação:',
-                    valor: '${_avaliacao.toStringAsFixed(1)} ★',
-                    rotuloClicavel: true,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: PilulaInfo(
-                    rotulo: 'Consultas:',
-                    valor: '$_totalConsultas',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
-            const TituloSecao('Dados Pessoais:'),
-            const SizedBox(height: 12),
-            CampoPerfil(
-              rotulo: 'Nome Completo:',
-              controlador: _controladorNomeCompleto,
-              somenteLeitura: !_editando,
-            ),
-            const SizedBox(height: 14),
-            CampoPerfil(
-              rotulo: 'Email:',
-              controlador: _controladorEmail,
-              somenteLeitura: !_editando,
-            ),
-            const SizedBox(height: 14),
-            CampoPerfil(
-              rotulo: 'Telefone:',
-              controlador: _controladorTelefone,
-              somenteLeitura: !_editando,
-            ),
-            const SizedBox(height: 14),
-            CampoPerfil(
-              rotulo: 'CRO:',
-              controlador: _controladorCro,
-              somenteLeitura: true, // CRO não é editável após cadastro
-            ),
-            const SizedBox(height: 24),
-            if (_editando) ...[
-              ElevatedButton(
-                onPressed: _salvando ? null : _salvarPerfil,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.azulPrimario,
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: _salvando
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Salvar Alterações',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: _cancelarEdicao,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: const Text('Cancelar'),
-              ),
-            ],
-          ],
+            onPressed: _logout,
+          ),
+          const SizedBox(width: 16),
         ],
-      ),
+      ],
+      corpo: (celular) => _corpo(celular),
     );
   }
 
-  Widget _construirLayoutDesktop() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _corpo(bool celular) {
+    Widget campo(String rotulo, TextEditingController c, {bool editavel = true}) =>
+        CampoPerfil(
+          rotulo: rotulo,
+          controlador: c,
+          somenteLeitura: !_editando || !editavel,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const BarraLateralMenu(paginaAtiva: PaginaApp.perfil),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      _controladorNomeCompleto.text.isEmpty
-                          ? 'Meu Perfil'
-                          : _controladorNomeCompleto.text,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textoEscuro,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        if (!_carregando && _erro == null) ...[
-                          OutlinedButton.icon(
-                            icon: Icon(_editando ? Icons.close : Icons.edit),
-                            label: Text(_editando ? 'Cancelar' : 'Editar'),
-                            onPressed: _editando
-                                ? _cancelarEdicao
-                                : () => setState(() => _editando = true),
-                          ),
-                          const SizedBox(width: 12),
-                          ElevatedButton.icon(
-                            icon: const Icon(Icons.logout),
-                            label: const Text('Sair'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.redAccent,
-                              foregroundColor: Colors.white,
-                            ),
-                            onPressed: _logout,
-                          ),
-                          const SizedBox(width: 16),
-                        ],
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFFD0E2FF),
-                              width: 2,
-                            ),
-                          ),
-                          child: Center(
-                            child: SvgPicture.asset(
-                              'assets/icons/tooth-svgrepo-com.svg',
-                              width: 32,
-                              height: 32,
-                              colorFilter: const ColorFilter.mode(
-                                AppColors.azulPrimario,
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+        // Celular: título + editar/sair aqui. Desktop: só o título.
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            TituloSecao(celular ? 'Seu perfil:' : 'Sua avaliação:'),
+            if (celular)
+              Row(children: [
+                IconButton(
+                  icon: Icon(_editando ? Icons.close : Icons.edit,
+                      color: AppColors.azulPrimario),
+                  onPressed: _alternarEdicao,
                 ),
-                const SizedBox(height: 28),
-                if (_carregando)
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(48.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                else if (_erro != null)
-                  _construirErroWidget()
-                else ...[
-                  const TituloSecao('Sua avaliação:'),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      SizedBox(
-                        width: 160,
-                        child: PilulaInfo(
-                          rotulo: 'Avaliação:',
-                          valor: '${_avaliacao.toStringAsFixed(1)} ★',
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      SizedBox(
-                        width: 160,
-                        child: PilulaInfo(
-                          rotulo: 'Consultas:',
-                          valor: '$_totalConsultas',
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
-                  const TituloSecao('Dados Pessoais:'),
-                  const SizedBox(height: 14),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CampoPerfil(
-                              rotulo: 'Nome Completo:',
-                              controlador: _controladorNomeCompleto,
-                              somenteLeitura: !_editando,
-                            ),
-                            const SizedBox(height: 14),
-                            CampoPerfil(
-                              rotulo: 'Email:',
-                              controlador: _controladorEmail,
-                              somenteLeitura: !_editando,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CampoPerfil(
-                              rotulo: 'Telefone:',
-                              controlador: _controladorTelefone,
-                              somenteLeitura: !_editando,
-                            ),
-                            const SizedBox(height: 14),
-                            CampoPerfil(
-                              rotulo: 'CRO:',
-                              controlador: _controladorCro,
-                              somenteLeitura: true,
-                            ),
-                            const SizedBox(height: 14),
-                            CampoEstatico(
-                              rotulo: 'Tipo de conta:',
-                              valor: _tipoConta,
-                              corValor: AppColors.azulPrimario,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  if (_editando) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        OutlinedButton(
-                          onPressed: _cancelarEdicao,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
-                          ),
-                          child: const Text('Cancelar'),
-                        ),
-                        const SizedBox(width: 16),
-                        ElevatedButton(
-                          onPressed: _salvando ? null : _salvarPerfil,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.azulPrimario,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 16,
-                            ),
-                          ),
-                          child: _salvando
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Salvar Alterações',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ],
-            ),
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.redAccent),
+                  onPressed: _logout,
+                ),
+              ]),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Row(
+            children: [
+              Expanded(
+                child: PilulaInfo(
+                  rotulo: 'Avaliação:',
+                  valor: '${_avaliacao.toStringAsFixed(1)} ★',
+                  rotuloClicavel: celular,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: PilulaInfo(rotulo: 'Consultas:', valor: '$_totalConsultas'),
+              ),
+            ],
           ),
         ),
+        const SizedBox(height: 28),
+        const TituloSecao('Dados Pessoais:'),
+        const SizedBox(height: 14),
+        GradeCampos(
+          colunas: celular ? 1 : 2,
+          filhos: [
+            campo('Nome Completo:', _nome),
+            campo('Email:', _email),
+            campo('Telefone:', _telefone),
+            campo('CRO:', _cro, editavel: false), // CRO não é editável
+            const CampoEstatico(
+              rotulo: 'Tipo de conta:',
+              valor: 'Dentista',
+              corValor: AppColors.azulPrimario,
+            ),
+          ],
+        ),
+        if (_editando) ...[
+          const SizedBox(height: 24),
+          _botoesEdicao(celular),
+        ],
       ],
     );
   }
 
-  Widget _construirErroWidget() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.redAccent),
-          const SizedBox(height: 16),
-          Text('Erro ao carregar dados: $_erro', textAlign: TextAlign.center),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _carregarPerfil,
-            child: const Text('Tentar Novamente'),
-          ),
-        ],
+  /// Salvar + Cancelar: empilhados no celular, lado a lado no desktop.
+  Widget _botoesEdicao(bool celular) {
+    final forma = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+
+    final salvar = ElevatedButton(
+      onPressed: _salvando ? null : _salvarPerfil,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.azulPrimario,
+        minimumSize: const Size(0, 50),
+        shape: forma,
       ),
+      child: _salvando
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
+          : const Text('Salvar Alterações',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
     );
+
+    final cancelar = OutlinedButton(
+      onPressed: _cancelarEdicao,
+      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50), shape: forma),
+      child: const Text('Cancelar'),
+    );
+
+    return celular
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [salvar, const SizedBox(height: 12), cancelar],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [cancelar, const SizedBox(width: 16), salvar],
+          );
   }
 }

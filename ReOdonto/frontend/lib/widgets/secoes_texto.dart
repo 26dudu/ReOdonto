@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-
 class TituloSecao extends StatelessWidget {
   final String texto;
   const TituloSecao(this.texto, {super.key});
@@ -28,7 +27,7 @@ class TextoVazio extends StatelessWidget {
     return Text(
       texto,
       style: const TextStyle(
-        fontSize: 12,
+        fontSize: 13,
         fontStyle: FontStyle.italic,
         color: AppColors.textoCinza,
       ),

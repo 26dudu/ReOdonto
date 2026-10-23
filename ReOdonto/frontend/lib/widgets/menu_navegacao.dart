@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
-
+import '../utils/avisos.dart';
 
 enum PaginaApp { perfil, menu, agenda, alertas }
 
@@ -19,30 +19,32 @@ class _ItemMenuInfo {
   });
 }
 
-
 const List<_ItemMenuInfo> _itensMenu = [
   _ItemMenuInfo(
     pagina: PaginaApp.perfil,
-     icone: Icons.person_outline, 
-     texto: 'Perfil',
-     rota: '/perfil'),
+    icone: Icons.person_outline,
+    texto: 'Perfil',
+    rota: '/perfil',
+  ),
   _ItemMenuInfo(
-    pagina: PaginaApp.menu, 
+    pagina: PaginaApp.menu,
     icone: Icons.home_outlined,
-     texto: 'Menu'),
-    
-  _ItemMenuInfo(
-      pagina: PaginaApp.agenda,
-      icone: Icons.calendar_today_outlined,
-      texto: 'Agenda',
-      rota: '/agenda'),
-  _ItemMenuInfo(
-      pagina: PaginaApp.alertas,
-      icone: Icons.notifications_none_outlined,
-      texto: 'Alertas'),
-      
-];
+    texto: 'Menu',
+    rota: '/menu',
+  ),
 
+  _ItemMenuInfo(
+    pagina: PaginaApp.agenda,
+    icone: Icons.calendar_today_outlined,
+    texto: 'Agenda',
+    rota: '/agenda',
+  ),
+  _ItemMenuInfo(
+    pagina: PaginaApp.alertas,
+    icone: Icons.notifications_none_outlined,
+    texto: 'Alertas',
+  ),
+];
 
 void _navegarParaItem(
   BuildContext context,
@@ -52,15 +54,12 @@ void _navegarParaItem(
   if (item.pagina == paginaAtiva) return;
 
   if (item.rota == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${item.texto} ainda está em construção.')),
-    );
+    mostrarAviso(context, '${item.texto} ainda está em construção.');
     return;
   }
 
   Navigator.of(context).pushReplacementNamed(item.rota!);
 }
-
 
 class BotaoMenuSanduiche extends StatelessWidget {
   const BotaoMenuSanduiche({super.key});
@@ -78,12 +77,9 @@ class BotaoMenuSanduiche extends StatelessWidget {
   }
 }
 
-
 class BarraLateralMenu extends StatelessWidget {
   final PaginaApp paginaAtiva;
-  const BarraLateralMenu({
-    super.key, 
-    required this.paginaAtiva});
+  const BarraLateralMenu({super.key, required this.paginaAtiva});
 
   @override
   Widget build(BuildContext context) {
@@ -94,17 +90,17 @@ class BarraLateralMenu extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (int i = 0; i < _itensMenu.length; i++) ...[
-            if (i > 0) const SizedBox(height: 18),
+          for (int posicao = 0; posicao < _itensMenu.length; posicao++) ...[
+            if (posicao > 0) const SizedBox(height: 18),
             InkWell(
               onTap: () =>
-                  _navegarParaItem(context, _itensMenu[i], paginaAtiva),
+                  _navegarParaItem(context, _itensMenu[posicao], paginaAtiva),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 2),
                 child: _ItemMenu(
-                  icone: _itensMenu[i].icone,
-                  texto: _itensMenu[i].texto,
-                  ativo: _itensMenu[i].pagina == paginaAtiva,
+                  icone: _itensMenu[posicao].icone,
+                  texto: _itensMenu[posicao].texto,
+                  ativo: _itensMenu[posicao].pagina == paginaAtiva,
                 ),
               ),
             ),
@@ -114,7 +110,6 @@ class BarraLateralMenu extends StatelessWidget {
     );
   }
 }
-
 
 class MenuSanduiche extends StatelessWidget {
   final PaginaApp paginaAtiva;
@@ -136,10 +131,7 @@ class MenuSanduiche extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFFD0E2FF),
-                    width: 2,
-                  ),
+                  border: Border.all(color: const Color(0xFFD0E2FF), width: 2),
                 ),
                 child: Center(
                   child: SvgPicture.asset(
@@ -156,8 +148,10 @@ class MenuSanduiche extends StatelessWidget {
             ),
             for (final item in _itensMenu)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 child: InkWell(
                   onTap: () => _navegarParaItem(context, item, paginaAtiva),
                   child: _ItemMenu(
@@ -179,10 +173,11 @@ class _ItemMenu extends StatelessWidget {
   final String texto;
   final bool ativo;
 
-  const _ItemMenu(
-    {required this.icone,
-     required this.texto,
-      this.ativo = false});
+  const _ItemMenu({
+    required this.icone,
+    required this.texto,
+    this.ativo = false,
+  });
 
   @override
   Widget build(BuildContext context) {

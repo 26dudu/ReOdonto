@@ -93,7 +93,6 @@ class SignupHeader extends StatelessWidget {
     );
   }
 
-
   List<TextSpan> _destacarReOdonto(String texto) {
     
     const marcador = 'ReOdonto'; 

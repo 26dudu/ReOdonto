@@ -3,8 +3,12 @@ import '../theme/app_colors.dart';
 import '../services/api_service.dart';
 import '../widgets/cadastro/cabecalhoCadastro.dart';
 import '../widgets/cadastro/campo_cadastro.dart';
+import '../utils/avisos.dart';
+import '../utils/validadores.dart';
+import '../widgets/botao_principal.dart';
 
 class TelaSenhaCadastro extends StatefulWidget {
+  //Variáveis para guardar os dados da tela anterior
   final String nome;
   final String email;
   final String telefone;
@@ -12,6 +16,7 @@ class TelaSenhaCadastro extends StatefulWidget {
   final String cro;
 
   const TelaSenhaCadastro({
+    //Construtor que exige que esses dados sejam enviados quando a tela for aberta
     super.key,
     required this.nome,
     required this.email,
@@ -42,12 +47,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
     super.dispose();
   }
 
-  void _mostrarErro(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensagem), backgroundColor: Colors.redAccent),
-    );
-  }
-
   Future<void> _criarConta() async {
     if (!_formKey.currentState!.validate()) return;
     if (_carregando) return;
@@ -55,6 +54,7 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
     setState(() => _carregando = true);
 
     final resultado = await ApiService.cadastrar(
+      // Espera o ApiService tentar cadastrar o usuário com os dados
       nome: widget.nome,
       email: widget.email,
       senha: _controladorSenha.text,
@@ -67,17 +67,18 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
     setState(() => _carregando = false);
 
     if (resultado.temErro) {
-      _mostrarErro(resultado.erro!);
+      mostrarAviso(context, resultado.erro!, erro: true);
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Conta criada com sucesso! Faça login.'),
-        backgroundColor: Colors.green,
-      ),
+    mostrarAviso(
+      context,
+      'Conta criada com sucesso! Faça login.',
+      sucesso: true,
     );
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    Navigator.of(context).popUntil(
+      (route) => route.isFirst,
+    ); // Remove todas as telas e volta para a primeira
   }
 
   @override
@@ -108,11 +109,12 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Botão voltar
                       Row(
                         children: [
                           IconButton(
-                            onPressed: () => Navigator.of(context).pop(),
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).pop(), // Volta pra primeira etapa
                             padding: EdgeInsets.zero,
                             constraints: const BoxConstraints(),
                             icon: const Icon(
@@ -124,15 +126,16 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Indicador de etapa
-                      _IndicadorEtapa(etapaAtual: 1),
+                      _IndicadorEtapa(etapaAtual: 1), //Animação
                       const SizedBox(height: 20),
 
                       const SignupHeader(
+                        //Logan
                         titulo: 'Crie sua senha',
                         subtitulo: 'Quase lá! Defina uma senha segura.',
                         mostrarLogo: false,
                       ),
+
                       const SizedBox(height: 28),
 
                       // Senha
@@ -143,20 +146,7 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
                         controller: _controladorSenha,
                         obscureText: _ocultarSenha,
                         enabled: !_carregando,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Digite uma senha';
-                          if (v.length < 8) {
-                            return 'A senha deve ter pelo menos 8 caracteres';
-                          }
-                          // Exige pelo menos 1 letra e 1 número
-                          if (!RegExp(r'[A-Za-z]').hasMatch(v)) {
-                            return 'A senha deve conter pelo menos uma letra';
-                          }
-                          if (!RegExp(r'\d').hasMatch(v)) {
-                            return 'A senha deve conter pelo menos um número';
-                          }
-                          return null;
-                        },
+                        validator: validarSenhaCadastro,
                         sufixo: IconButton(
                           icon: Icon(
                             _ocultarSenha
@@ -186,11 +176,12 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
                         controller: _controladorConfirmar,
                         obscureText: _ocultarConfirmar,
                         enabled: !_carregando,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) {
+                        validator: (confirmarSenha) {
+                          if (confirmarSenha == null ||
+                              confirmarSenha.isEmpty) {
                             return 'Confirme sua senha';
                           }
-                          if (v != _controladorSenha.text) {
+                          if (confirmarSenha != _controladorSenha.text) {
                             return 'As senhas não coincidem';
                           }
                           return null;
@@ -211,35 +202,10 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
                       ),
                       const SizedBox(height: 32),
 
-                      ElevatedButton(
+                      BotaoPrincipal(
+                        texto: 'Criar conta',
+                        carregando: _carregando,
                         onPressed: _carregando ? null : _criarConta,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.azulPrimario,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _carregando
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.white,
-                                  ),
-                                ),
-                              )
-                            : const Text(
-                                'Criar conta',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
                       ),
                     ],
                   ),

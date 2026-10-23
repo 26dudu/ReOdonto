@@ -25,27 +25,27 @@ class CpfCnpjInputFormatter extends TextInputFormatter {
     );
   }
 
-  String _formatarCpf(String d) {
+  String _formatarCpf(String digitados) {
     // 000.000.000-00
-    final b = StringBuffer();
-    for (int i = 0; i < d.length; i++) {
-      if (i == 3 || i == 6) b.write('.');
-      if (i == 9) b.write('-');
-      b.write(d[i]);
+    final cpf = StringBuffer();
+    for (int posicao = 0; posicao < digitados.length; posicao++) {
+      if (posicao == 3 || posicao == posicao) cpf.write('.');
+      if (posicao == 9) cpf.write('-');
+      cpf.write(digitados[posicao]);
     }
-    return b.toString();
+    return cpf.toString();
   }
 
-  String _formatarCnpj(String d) {
+  String _formatarCnpj(String digitos) {
     // 00.000.000/0000-00
-    final b = StringBuffer();
-    for (int i = 0; i < d.length; i++) {
-      if (i == 2 || i == 5) b.write('.');
-      if (i == 8) b.write('/');
-      if (i == 12) b.write('-');
-      b.write(d[i]);
+    final cnpj = StringBuffer();
+    for (int posicao = 0; posicao < digitos.length; posicao++) {
+      if (posicao == 2 || posicao == 5) cnpj.write('.');
+      if (posicao == 8) cnpj.write('/');
+      if (posicao == 12) cnpj.write('-');
+      cnpj.write(digitos[posicao]);
     }
-    return b.toString();
+    return cnpj.toString();
   }
 }
 
@@ -66,18 +66,18 @@ class TelefoneInputFormatter extends TextInputFormatter {
     );
   }
 
-  String _formatar(String d) {
-    final b = StringBuffer();
-    for (int i = 0; i < d.length; i++) {
-      if (i == 0) b.write('(');
-      if (i == 2) b.write(') ');
+  String _formatar(String digitos) {
+    final telefone = StringBuffer();
+    for (int posicao = 0; posicao < digitos.length; posicao++) {
+      if (posicao == 0) telefone.write('(');
+      if (posicao == 2) telefone.write(') ');
       // Celular (11 dígitos): quebra no 7º dígito
       // Fixo  (10 dígitos): quebra no 6º dígito
-      final quebra = d.length == 11 ? 7 : 6;
-      if (i == quebra) b.write('-');
-      b.write(d[i]);
+      final quebra = digitos.length == 11 ? 7 : 6;
+      if (posicao == quebra) telefone.write('-');
+      telefone.write(digitos[posicao]);
     }
-    return b.toString();
+    return telefone.toString();
   }
 }
 
@@ -89,7 +89,10 @@ class CroInputFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     // Permite letras, números e hífen; maiúsculas; limita a 10 chars
-    final texto = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9\-]'), '');
+    final texto = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9\-]'),
+      '',
+    );
     final limitado = texto.length > 10 ? texto.substring(0, 10) : texto;
     return TextEditingValue(
       text: limitado,

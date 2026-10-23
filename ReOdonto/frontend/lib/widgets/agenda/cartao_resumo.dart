@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-/// Resumo do agendamento (paciente + tipo de consulta), mostrado na
-/// última etapa do modal de novo agendamento, antes de escolher a data.
+// Resumo do agendamento (paciente + tipo de consulta), mostrado na última etapa do modal de novo agendamento antes de escolher a data
 class CartaoResumo extends StatelessWidget {
   final String paciente;
   final String consulta;
@@ -20,7 +19,6 @@ class CartaoResumo extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.preenchimentoCampo,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.bordaCampo),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -34,9 +32,17 @@ class CartaoResumo extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _LinhaResumo(icone: Icons.person_outline, label: 'Paciente', valor: paciente),
+          _LinhaResumo(icone: 
+            Icons.person_outline, 
+            label: 'Paciente', 
+            valor: paciente
+          ),
           const SizedBox(height: 6),
-          _LinhaResumo(icone: Icons.medical_services_outlined, label: 'Consulta', valor: consulta),
+          _LinhaResumo(icone: 
+            Icons.medical_services_outlined, 
+            label: 'Consulta', 
+            valor: consulta
+          ),
         ],
       ),
     );

@@ -234,7 +234,7 @@ class ApiService {
   // ----------------------------------------------------------------
   // CRIAR AGENDAMENTO — POST /agendamentos/
   // O app é usado só pelo dentista, então quem chega aqui é sempre um
-  // paciente sem conta (nome + telefone), tipo de consulta e data/hora.
+  // paciente sem conta (nome + telefone), tipo de consulta (texto livre) e data/hora.
   //
   // TODO(backend): `clinicaId` ficou opcional porque ainda não existe
   // vínculo dentista→clínica no backend. Assim que existir, o ideal é o
@@ -243,7 +243,6 @@ class ApiService {
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> criarAgendamento({
     required int dentistaId,
-    int? consultaId,
     required String dataHora, // ISO 8601: "2025-08-15T14:00:00"
     required String nomePaciente,
     required String telefonePaciente,
@@ -257,7 +256,6 @@ class ApiService {
             headers: _headersAuth,
             body: jsonEncode({
               'dentista_id': dentistaId,
-              if (consultaId != null) 'consulta_id': consultaId,
               'data_hora': dataHora,
               'nome_paciente': nomePaciente,
               'telefone_paciente': telefonePaciente,
@@ -418,27 +416,6 @@ class ApiService {
       }
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       return ApiResultado.falha(body['erro'] ?? 'Erro ao listar dentistas');
-    } on SocketException {
-      return const ApiResultado.falha('Sem conexão com o servidor.');
-    } catch (e) {
-      return ApiResultado.falha('Erro inesperado: $e');
-    }
-  }
-
-  // ----------------------------------------------------------------
-  // LISTAR CONSULTAS — GET /consultas/
-  // ----------------------------------------------------------------
-  static Future<ApiResultado<List<dynamic>>> listarConsultas() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$_baseUrl/consultas/'), headers: _headersAuth)
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return ApiResultado.sucesso(jsonDecode(response.body) as List<dynamic>);
-      }
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return ApiResultado.falha(body['erro'] ?? 'Erro ao listar consultas');
     } on SocketException {
       return const ApiResultado.falha('Sem conexão com o servidor.');
     } catch (e) {

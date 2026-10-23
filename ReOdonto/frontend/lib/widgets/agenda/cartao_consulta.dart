@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import '../../models/agendamento.dart';
 import '../../theme/app_colors.dart';
 
-// Cores de status específicas desse card — não fazem parte da paleta
-const Color _corConfirmado = Color(0xFF1FAE7D);
-const Color _corPendente = Color(0xFFF2994A);
-const Color _corEstrela = Color(0xFFF2C94C);
-
-
+// Cartão de um agendamento. O botão depende do estado:
+//   vago -> "Agendar Paciente" | Pendente -> "Confirmar Atendimento" |
+//   demais -> "Deseja Cancelar?"
 class CartaoConsulta extends StatelessWidget {
   final Agendamento consulta;
   final VoidCallback? onConfirmar;
@@ -24,9 +21,11 @@ class CartaoConsulta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tipo = consulta.tipoConsulta;
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.fundoCartao,
         borderRadius: BorderRadius.circular(12),
@@ -35,18 +34,18 @@ class CartaoConsulta extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _linhaPaciente(),
-          const SizedBox(height: 6),
-          _linha('Dia:', consulta.dia),
-          const SizedBox(height: 4),
-          _linha('Horário:', consulta.horario),
+          _titulo(),
+          if (tipo != null && tipo.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            _linha('Consulta:', tipo),
+          ],
           if (consulta.preco != null) ...[
             const SizedBox(height: 4),
             _linha('Preço:', formatarPreco(consulta.preco!)),
           ],
           if (!consulta.vago) ...[
-            const SizedBox(height: 4),
-            _linhaStatus(),
+            const SizedBox(height: 10),
+            _pilulaStatus(),
           ],
           const SizedBox(height: 12),
           _botao(),
@@ -55,41 +54,43 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  Widget _linhaPaciente() {
+  /// Nome do paciente (com nota, se houver) ou "Horário vago".
+  Widget _titulo() {
     if (consulta.vago) {
       return const Text(
-        'Paciente: Indefinido',
+        'Horário vago',
         style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
           color: AppColors.textoEscuro,
         ),
       );
     }
-    return RichText(
-      text: TextSpan(
+    return Text.rich(
+      TextSpan(
         style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
           color: AppColors.textoEscuro,
         ),
         children: [
-          TextSpan(text: 'Paciente: ${consulta.paciente}'),
+          TextSpan(text: consulta.paciente),
           if (consulta.avaliacaoPaciente != null)
             TextSpan(
               text:
                   ' ${consulta.avaliacaoPaciente!.toStringAsFixed(1).replaceAll('.', ',')} ★',
-              style: const TextStyle(color: _corEstrela),
+              style: const TextStyle(color: AppColors.estrela),
             ),
         ],
       ),
     );
   }
 
+  /// Linha "Rótulo: valor" (rótulo cinza, valor escuro).
   Widget _linha(String rotulo, String valor) {
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(fontSize: 12, color: AppColors.textoCinza),
+    return Text.rich(
+      TextSpan(
+        style: const TextStyle(fontSize: 13, color: AppColors.textoCinza),
         children: [
           TextSpan(text: '$rotulo '),
           TextSpan(
@@ -104,18 +105,26 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  Widget _linhaStatus() {
-    final cor = consulta.status == 'Confirmado' ? _corConfirmado : _corPendente;
-    return RichText(
-      text: TextSpan(
-        style: const TextStyle(fontSize: 12, color: AppColors.textoCinza),
-        children: [
-          const TextSpan(text: 'Status: '),
-          TextSpan(
-            text: consulta.status,
-            style: TextStyle(color: cor, fontWeight: FontWeight.w700),
-          ),
-        ],
+  /// "Pílula" colorida com o status (Confirmado = verde, resto = laranja).
+  Widget _pilulaStatus() {
+    final confirmado = consulta.status == 'Confirmado';
+    final corFundo = confirmado ? AppColors.confirmado : AppColors.pendente;
+    final corTexto =
+        confirmado ? AppColors.confirmadoTexto : AppColors.pendenteTexto;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: corFundo.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        consulta.status ?? 'Pendente',
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: corTexto,
+        ),
       ),
     );
   }
@@ -141,12 +150,14 @@ class CartaoConsulta extends StatelessWidget {
           backgroundColor: AppColors.azulPrimario,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          // 12 de padding vertical deixa o botão com ~44px de altura,
+          // o mínimo recomendado para toque.
+          padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         ),
         child: Text(
           texto,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
         ),
       ),
     );

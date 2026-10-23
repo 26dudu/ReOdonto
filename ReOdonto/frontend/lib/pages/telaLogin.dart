@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../theme/app_colors.dart';
 import '../services/api_service.dart';
 import '../services/sessao_usuario.dart';
-import '../widgets/botao_google_login.dart';
+import '../utils/avisos.dart';
+import '../widgets/botao_principal.dart';
+import '../widgets/recuperarSenha/cabecalho_marca.dart';
+import '../widgets/recuperarSenha/campo_login.dart';
 import 'telaCadastro.dart';
+import 'telaEsqueciSenha.dart';
 
 class TelaLogin extends StatefulWidget {
   const TelaLogin({super.key});
@@ -14,42 +16,37 @@ class TelaLogin extends StatefulWidget {
 }
 
 class _TelaLoginState extends State<TelaLogin> {
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController senhaController = TextEditingController();
+  static const _azul = Color(0xFF1E5FD8);
+  static const _verde = Color(0xFF00C1A2);
+
+  final _email = TextEditingController();
+  final _senha = TextEditingController();
   bool _ocultarSenha = true;
   bool _carregando = false;
 
-  static const double _larguraMaxima = 440;
-  static const double _quebraCelular = 600;
-
   @override
   void dispose() {
-    emailController.dispose();
-    senhaController.dispose();
+    _email.dispose();
+    _senha.dispose();
     super.dispose();
   }
 
   Future<void> _fazerLogin() async {
-    final email = emailController.text.trim();
-    final senha = senhaController.text;
+    final email = _email.text.trim();
+    final senha = _senha.text;
 
     if (email.isEmpty || !email.contains('@')) {
-      _mostrarErro('Digite um email válido');
-      return;
+      return mostrarAviso(context, 'Digite um email válido', erro: true);
     }
     if (senha.isEmpty) {
-      _mostrarErro('Digite sua senha');
-      return;
+      return mostrarAviso(context, 'Digite sua senha', erro: true);
     }
 
     setState(() => _carregando = true);
 
-    // Tenta login como dentista primeiro, depois como paciente
-    ApiResultado<Map<String, dynamic>> resultado =
-        await ApiService.loginDentista(email: email, senha: senha);
-
+    // Tenta como dentista primeiro; se falhar, tenta como paciente.
+    var resultado = await ApiService.loginDentista(email: email, senha: senha);
     if (resultado.temErro) {
-      // Não era dentista — tenta como paciente
       resultado = await ApiService.login(email: email, senha: senha);
     }
 
@@ -57,339 +54,138 @@ class _TelaLoginState extends State<TelaLogin> {
     setState(() => _carregando = false);
 
     if (resultado.temErro) {
-      _mostrarErro(resultado.erro!);
-      return;
+      return mostrarAviso(context, resultado.erro!, erro: true);
     }
 
     await SessaoUsuario.salvar(resultado.dados!);
-
     if (!mounted) return;
 
-    
-    final rota = SessaoUsuario.ehDentista ? '/agenda' : '/perfil';
-    Navigator.of(context).pushReplacementNamed(rota);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Bem-vindo, ${SessaoUsuario.nome}!')),
+    Navigator.of(context).pushReplacementNamed(
+      SessaoUsuario.ehDentista ? '/agenda' : '/perfil',
     );
+    mostrarAviso(context, 'Bem-vindo, ${SessaoUsuario.nome}!');
   }
 
-  void _mostrarErro(String mensagem) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(mensagem),
-        backgroundColor: Colors.redAccent,
-      ),
-    );
-  }
+  void _abrir(Widget tela) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => tela));
+
+  Widget _rotulo(String texto) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(
+          texto,
+          style: const TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF4A5568),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 243, 248, 255),
+      backgroundColor: const Color(0xFFF3F8FF),
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, restricoes) {
-            final celular = restricoes.maxWidth < _quebraCelular;
-
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: celular ? 32.0 : 48.0,
-                vertical: 24.0,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: _larguraMaxima),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: MediaQuery.sizeOf(context).width < 600 ? 32 : 48,
+            vertical: 24,
+          ),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 20),
+                  const CabecalhoMarca(),
+                  const SizedBox(height: 40),
+                  const Text.rich(
+                    TextSpan(
+                      style: TextStyle(fontSize: 16, color: Color(0xFF1C2434)),
+                      children: [
+                        TextSpan(text: 'Faça login em sua conta '),
+                        TextSpan(
+                          text: 'ReOdonto',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: _azul,
+                          ),
+                        ),
+                        TextSpan(text: '!'),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  _rotulo('Email'),
+                  CampoLogin(
+                    controller: _email,
+                    hintText: 'Digite seu email',
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: !_carregando,
+                    prefixIcon: const Icon(Icons.email_outlined),
+                  ),
+                  const SizedBox(height: 20),
+                  _rotulo('Senha'),
+                  CampoLogin(
+                    controller: _senha,
+                    hintText: 'Digite sua senha',
+                    obscureText: _ocultarSenha,
+                    enabled: !_carregando,
+                    prefixIcon: const Icon(Icons.lock_outline),
+                    suffixIcon: IconButton(
+                      icon: Icon(_ocultarSenha
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined),
+                      onPressed: _carregando
+                          ? null
+                          : () => setState(() => _ocultarSenha = !_ocultarSenha),
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: _carregando
+                          ? null
+                          : () => _abrir(const TelaRedefinirSenha()),
+                      style: TextButton.styleFrom(padding: EdgeInsets.zero),
+                      child: const Text(
+                        'Esqueci minha senha',
+                        style: TextStyle(color: _verde, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  BotaoPrincipal(
+                    texto: 'Entrar',
+                    carregando: _carregando,
+                    cor: _azul,
+                    onPressed: _carregando ? null : _fazerLogin,
+                  ),
+                  const SizedBox(height: 32),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: const Color(0xFFD0E2FF),
-                                width: 2,
-                              ),
-                            ),
-                            child: Center(
-                              child: SvgPicture.asset(
-                                'assets/icons/tooth-svgrepo-com.svg',
-                                width: 32,
-                                height: 32,
-                                colorFilter: const ColorFilter.mode(
-                                  AppColors.azulPrimario,
-                                  BlendMode.srcIn,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'SUA',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF00C1A2),
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                              Text(
-                                'AGENDA',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF1C2434),
-                                  height: 0.9,
-                                ),
-                              ),
-                              Text(
-                                'CHEIA',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1C2434),
-                                ),
-                              ),
-                              Text(
-                                'CLÍNICAS ODONTOLÓGICAS - AGENDAMENTO ONLINE',
-                                style: TextStyle(
-                                  fontSize: 6,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 40),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            'Faça login em sua conta ',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF1C2434),
-                            ),
-                          ),
-                          Text(
-                            'ReOdonto',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1E5FD8),
-                            ),
-                          ),
-                          Text(
-                            '!',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF1C2434),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
-                      const Text(
-                        'Email',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF4A5568),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        enabled: !_carregando,
-                        decoration: InputDecoration(
-                          hintText: 'Digite seu email',
-                          hintStyle: const TextStyle(color: Colors.black26),
-                          prefixIcon: const Icon(
-                            Icons.email_outlined,
-                            color: Color.fromARGB(255, 88, 92, 100),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE2E8F0)),
+                      const Text('Ainda não tem uma conta? ',
+                          style: TextStyle(fontSize: 14)),
+                      GestureDetector(
+                        onTap: _carregando ? null : () => _abrir(const SignupPage()),
+                        child: const Text(
+                          'Cadastre-se',
+                          style: TextStyle(
+                            color: _azul,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Senha',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: Color.fromARGB(255, 88, 92, 100),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextField(
-                        controller: senhaController,
-                        obscureText: _ocultarSenha,
-                        enabled: !_carregando,
-                        decoration: InputDecoration(
-                          hintText: 'Digite sua senha',
-                          hintStyle: const TextStyle(color: Colors.black26),
-                          prefixIcon: const Icon(
-                            Icons.lock_outline,
-                            color: Color.fromARGB(255, 88, 92, 100),
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _ocultarSenha
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: Colors.black45,
-                            ),
-                            onPressed: _carregando
-                                ? null
-                                : () => setState(
-                                    () => _ocultarSenha = !_ocultarSenha),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
-                          contentPadding:
-                              const EdgeInsets.symmetric(vertical: 16),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide:
-                                const BorderSide(color: Color(0xFFE2E8F0)),
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton(
-                          onPressed: _carregando ? null : () {},
-                          style:
-                              TextButton.styleFrom(padding: EdgeInsets.zero),
-                          child: const Text(
-                            'Esqueci minha senha',
-                            style: TextStyle(
-                              color: Color(0xFF00C1A2),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _carregando ? null : _fazerLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF1E5FD8),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(52),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: _carregando
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Entrar',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                      const SizedBox(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Ainda não tem uma conta? ',
-                            style: TextStyle(fontSize: 14),
-                          ),
-                          GestureDetector(
-                            onTap: _carregando
-                                ? null
-                                : () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute(
-                                        builder: (_) => const SignupPage(),
-                                      ),
-                                    );
-                                  },
-                            child: const Text(
-                              'Cadastre-se',
-                              style: TextStyle(
-                                color: Color(0xFF1E5FD8),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Row(
-                        children: [
-                          Expanded(
-                              child: Divider(
-                                  color: Color(0xFFE2E8F0), thickness: 1)),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16),
-                            child: Text('ou',
-                                style: TextStyle(color: Colors.grey)),
-                          ),
-                          Expanded(
-                              child: Divider(
-                                  color: Color(0xFFE2E8F0), thickness: 1)),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      BotaoGoogleLogin(
-                        onLoginSucesso: () {
-                          if (mounted) {
-                            Navigator.of(context).pushReplacementNamed('/perfil');
-                          }
-                        },
-                        onLoginErro: () {
-                          // Erro já foi mostrado no widget
-                        },
                       ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );

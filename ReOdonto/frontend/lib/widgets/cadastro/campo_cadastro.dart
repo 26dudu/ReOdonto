@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-
 class CampoCadastro extends StatelessWidget {
   final String rotulo;
   final String hint;
@@ -9,10 +8,11 @@ class CampoCadastro extends StatelessWidget {
   final TextEditingController controller;
   final String? Function(String?)? validator;
   final TextInputType tipo;
-  final List<TextInputFormatter>? inputFormatters;
+  final List<TextInputFormatter>?
+  inputFormatters; //As regras de formatação e máscaras em tempo real
   final bool obscureText;
-  final bool enabled;
-  final Widget? sufixo;
+  final bool enabled; //serve para ver se o usuario pode digitar
+  final Widget? sufixo; //tipo o olhinho da senha
 
   const CampoCadastro({
     super.key,

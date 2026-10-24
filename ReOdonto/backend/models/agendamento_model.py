@@ -7,7 +7,6 @@ class Agendamento(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     dentista_id = db.Column(db.Integer, db.ForeignKey('dentista.id'), nullable=False)
     clinica_id = db.Column(db.Integer, db.ForeignKey('clinica.id'), nullable=True)
-    consulta_id = db.Column(db.Integer, db.ForeignKey('consulta.id'), nullable=True)
     consulta_customizada = db.Column(db.String(200), nullable=True)  # tipo livre
     nome_paciente = db.Column(db.String(100), nullable=True)          # walk-in
     telefone_paciente = db.Column(db.String(20), nullable=True)       # walk-in
@@ -18,14 +17,12 @@ class Agendamento(db.Model):
     # Relacionamentos
     dentista = db.relationship('Dentista', backref='agendamentos')
     clinica = db.relationship('Clinica', backref='agendamentos')
-    consulta = db.relationship('Consulta', backref='agendamentos')
 
     def to_dict(self):
         return {
             'id': self.id,
             'dentista_id': self.dentista_id,
             'clinica_id': self.clinica_id,
-            'consulta_id': self.consulta_id,
             'consulta_customizada': self.consulta_customizada,
             'nome_paciente': self.nome_paciente,
             'telefone_paciente': self.telefone_paciente,
@@ -35,14 +32,6 @@ class Agendamento(db.Model):
 
     def to_dict_completo(self):
         """Inclui nomes dos relacionamentos — evita múltiplas chamadas do Flutter."""
-        nome_consulta = None
-        valor_consulta = None
-        if self.consulta:
-            nome_consulta = self.consulta.nome
-            valor_consulta = self.consulta.valor
-        elif self.consulta_customizada:
-            nome_consulta = self.consulta_customizada
-
         return {
             'id': self.id,
             'dentista_id': self.dentista_id,
@@ -53,9 +42,7 @@ class Agendamento(db.Model):
                 f"{self.clinica.rua}, {self.clinica.numero} — {self.clinica.bairro}"
                 if self.clinica and self.clinica.rua else None
             ),
-            'consulta_id': self.consulta_id,
-            'consulta_nome': nome_consulta,
-            'consulta_valor': valor_consulta,
+            'consulta_nome': self.consulta_customizada,
             'consulta_customizada': self.consulta_customizada,
             'paciente_nome': self.nome_paciente,
             'telefone_paciente': self.telefone_paciente,

@@ -114,3 +114,58 @@ def deletar(id):
         return jsonify({'erro': 'Acesso negado'}), 403
     service.deletar_paciente(id)
     return '', 204
+
+
+@paciente_bp.route('/recuperar-senha', methods=['POST'])
+def recuperar_senha():
+    """
+    Solicita recuperação de senha. Rota pública.
+    Body: { "email": "..." }
+
+    Retorno:
+    - 200: Email existe e código foi enviado
+    - 404: Email não está cadastrado
+    - 400: Email inválido
+    - 500: Erro interno ao processar
+    """
+    data, erro = _json_ou_erro()
+    if erro:
+        return erro
+
+    email = data.get('email', '').strip()
+    if not email or '@' not in email:
+        return jsonify({'erro': 'Email inválido'}), 400
+
+    try:
+        encontrado = service.solicitar_recuperacao_senha(email)
+
+        if not encontrado:
+            return jsonify({'erro': 'Email não encontrado no banco de dados'}), 404
+
+        return jsonify({'mensagem': 'Código de verificação enviado. Verifique seu email.'}), 200
+    except Exception:
+        return jsonify({'erro': 'Erro ao processar solicitação'}), 500
+
+
+@paciente_bp.route('/redefinir-senha', methods=['POST'])
+def redefinir_senha():
+    """
+    Redefine a senha com o código OTP. Rota pública.
+    Body: { "email": "...", "codigo": "123456", "nova_senha": "..." }
+    """
+    data, erro = _json_ou_erro()
+    if erro:
+        return erro
+
+    email = data.get('email', '').strip()
+    codigo = data.get('codigo', '').strip()
+    nova_senha = data.get('nova_senha', '')
+
+    if not email or not codigo or not nova_senha:
+        return jsonify({'erro': 'Campos email, codigo e nova_senha são obrigatórios'}), 400
+
+    try:
+        service.redefinir_senha(email, codigo, nova_senha)
+        return jsonify({'mensagem': 'Senha redefinida com sucesso'}), 200
+    except ValueError as e:
+        return jsonify({'erro': str(e)}), 400

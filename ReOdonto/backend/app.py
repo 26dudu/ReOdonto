@@ -8,7 +8,6 @@ from database.db import db
 from controllers.paciente_controller import paciente_bp
 from controllers.dentista_controller import dentista_bp
 from controllers.clinica_controller import clinica_bp
-from controllers.consulta_controller import consulta_bp
 from controllers.agendamento_controller import agendamento_bp
 from controllers.cep_controller import cep_bp
 from controllers.google_auth_controller import google_auth_bp
@@ -31,6 +30,9 @@ app = Flask(__name__)
 
 # --- Segurança ---
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-troque-em-producao')
+app.config['SESSION_COOKIE_SECURE'] = False   # True em produção (HTTPS)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-troque-em-producao')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # token expira em 8h
 
@@ -92,10 +94,12 @@ def habilitar_foreign_keys(dbapi_connection, connection_record):
 app.register_blueprint(paciente_bp)
 app.register_blueprint(dentista_bp)
 app.register_blueprint(clinica_bp)
-app.register_blueprint(consulta_bp)
 app.register_blueprint(agendamento_bp)
 app.register_blueprint(cep_bp)
 app.register_blueprint(google_auth_bp)
+
+# --- Registra modelos adicionais para que db.create_all() crie as tabelas ---
+import models.recuperacao_senha_model  # noqa: F401 — registra tabela recuperacao_senha
 
 # --- Criar tabelas ---
 with app.app_context():

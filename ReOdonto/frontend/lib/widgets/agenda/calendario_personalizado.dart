@@ -16,7 +16,8 @@ class CalendarioPersonalizado extends StatefulWidget {
   });
 
   @override
-  State<CalendarioPersonalizado> createState() => _CalendarioPersonalizadoState();
+  State<CalendarioPersonalizado> createState() =>
+      _CalendarioPersonalizadoState();
 }
 
 class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
@@ -40,20 +41,26 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
   void _proximoMes() {
     setState(() {
       _mesAtual = DateTime(_mesAtual.year, _mesAtual.month + 1);
-      if (_mesAtual.isAfter(DateTime(widget.dataFinal.year, widget.dataFinal.month + 1))) {
+      if (_mesAtual.isAfter(
+        DateTime(widget.dataFinal.year, widget.dataFinal.month + 1),
+      )) {
         _mesAtual = DateTime(widget.dataFinal.year, widget.dataFinal.month);
       }
     });
   }
 
   bool _podeIrAnterior() {
-    return !_mesAtual.isAtSameMomentAs(DateTime(widget.dataInicial.year, widget.dataInicial.month));
+    return !_mesAtual.isAtSameMomentAs(
+      DateTime(widget.dataInicial.year, widget.dataInicial.month),
+    );
   }
 
   bool _podeIrProximo() {
     final proximoMes = DateTime(_mesAtual.year, _mesAtual.month + 1);
-    return proximoMes.isBefore(widget.dataFinal) || 
-           proximoMes.isAtSameMomentAs(DateTime(widget.dataFinal.year, widget.dataFinal.month));
+    return proximoMes.isBefore(widget.dataFinal) ||
+        proximoMes.isAtSameMomentAs(
+          DateTime(widget.dataFinal.year, widget.dataFinal.month),
+        );
   }
 
   List<DateTime> _obterDiasDoMes(int year, int month) {
@@ -62,36 +69,37 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
     final dias = <DateTime>[];
 
     // Adiciona dias em branco do mês anterior
-    for (int i = primeiro.weekday - 1; i > 0; i--) {
-      dias.add(primeiro.subtract(Duration(days: i)));
+    for (int diasAntes = primeiro.weekday - 1; diasAntes > 0; diasAntes--) {
+      dias.add(primeiro.subtract(Duration(days: diasAntes)));
     }
 
     // Adiciona todos os dias do mês
-    for (int i = 1; i <= ultimo.day; i++) {
-      dias.add(DateTime(year, month, i));
+    for (int diaDoMes = 1; diaDoMes <= ultimo.day; diaDoMes++) {
+      dias.add(DateTime(year, month, diaDoMes));
     }
 
     // Completa com dias do próximo mês se necessário
     final diasFaltantes = 42 - dias.length; // 6 linhas × 7 dias
-    for (int i = 1; i <= diasFaltantes; i++) {
-      dias.add(ultimo.add(Duration(days: i)));
+    for (int diasDepois = 1; diasDepois <= diasFaltantes; diasDepois++) {
+      dias.add(ultimo.add(Duration(days: diasDepois)));
     }
 
     return dias;
   }
 
-  bool _estahDesabilitado(DateTime dia) {
-    final hoje = DateTime.now();
-    final hojeSemHora = DateTime(hoje.year, hoje.month, hoje.day);
-    final diaSemHora = DateTime(dia.year, dia.month, dia.day);
+  bool _estaDesabilitado(DateTime dia) {
+    final hojeSemHora = _semHora(DateTime.now());
+    final diaSemHora = _semHora(dia);
 
     // Desabilita datas no passado e fora do intervalo permitido
     if (diaSemHora.isBefore(hojeSemHora)) return true;
-    if (diaSemHora.isBefore(widget.dataInicial)) return true;
-    if (diaSemHora.isAfter(widget.dataFinal)) return true;
+    if (diaSemHora.isBefore(_semHora(widget.dataInicial))) return true;
+    if (diaSemHora.isAfter(_semHora(widget.dataFinal))) return true;
 
     return false;
   }
+
+  DateTime _semHora(DateTime d) => DateTime(d.year, d.month, d.day);
 
   bool _pertenceAoMes(DateTime dia) {
     return dia.year == _mesAtual.year && dia.month == _mesAtual.month;
@@ -105,7 +113,7 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
 
     return Column(
       children: [
-        // ---- Cabeçalho com navegação de meses ----
+        // Cabeçalho com navegação de meses
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -114,7 +122,9 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
               IconButton(
                 onPressed: _podeIrAnterior() ? _mesAnterior : null,
                 icon: const Icon(Icons.chevron_left),
-                color: _podeIrAnterior() ? AppColors.azulPrimario : AppColors.bordaCampo,
+                color: _podeIrAnterior()
+                    ? AppColors.azulPrimario
+                    : AppColors.bordaCampo,
               ),
               Text(
                 _obterNomeMes(_mesAtual.month, _mesAtual.year),
@@ -127,13 +137,15 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
               IconButton(
                 onPressed: _podeIrProximo() ? _proximoMes : null,
                 icon: const Icon(Icons.chevron_right),
-                color: _podeIrProximo() ? AppColors.azulPrimario : AppColors.bordaCampo,
+                color: _podeIrProximo()
+                    ? AppColors.azulPrimario
+                    : AppColors.bordaCampo,
               ),
             ],
           ),
         ),
 
-        // ---- Cabeçalho com dias da semana ----
+        //Cabeçalho com dias da semana
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
@@ -145,14 +157,14 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
               _DiaSemanaCabecalho('Qua'),
               _DiaSemanaCabecalho('Qui'),
               _DiaSemanaCabecalho('Sex'),
-              _DiaSemanaCabecalho('Sab'),
+              _DiaSemanaCabecalho('Sáb'),
             ],
           ),
         ),
 
         const SizedBox(height: 8),
 
-        // ---- Grade de dias ----
+        // Grade de dias
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: GridView.builder(
@@ -168,9 +180,10 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
             itemBuilder: (context, index) {
               final dia = diasDoMes[index];
               final pertenceAoMes = _pertenceAoMes(dia);
-              final estahDesabilitado = _estahDesabilitado(dia);
+              final estaDesabilitado = _estaDesabilitado(dia);
               final diaSemHora = DateTime(dia.year, dia.month, dia.day);
-              final estahSelecionado = widget.dataSelecionada != null &&
+              final estahSelecionado =
+                  widget.dataSelecionada != null &&
                   diaSemHora.isAtSameMomentAs(
                     DateTime(
                       widget.dataSelecionada!.year,
@@ -178,21 +191,21 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
                       widget.dataSelecionada!.day,
                     ),
                   );
-              final ehHoje = diaSemHora.isAtSameMomentAs(hojeSemHora);
+              final Hoje = diaSemHora.isAtSameMomentAs(hojeSemHora);
 
               return GestureDetector(
-                onTap: !pertenceAoMes || estahDesabilitado
+                onTap: !pertenceAoMes || estaDesabilitado
                     ? null
                     : () => widget.onDataSelecionada(dia),
                 child: Container(
                   decoration: BoxDecoration(
                     color: estahSelecionado
                         ? AppColors.azulPrimario
-                        : ehHoje
-                            ? AppColors.azulClaro.withValues(alpha: 0.2)
-                            : Colors.transparent,
+                        : Hoje
+                        ? AppColors.azulClaro.withValues(alpha: 0.2)
+                        : Colors.transparent,
                     border: Border.all(
-                      color: ehHoje ? AppColors.azulClaro : Colors.transparent,
+                      color: Hoje ? AppColors.azulClaro : Colors.transparent,
                       width: 1.5,
                     ),
                     borderRadius: BorderRadius.circular(8),
@@ -202,12 +215,14 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
                       dia.day.toString(),
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight: estahSelecionado || ehHoje ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: estahSelecionado || Hoje
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                         color: estahSelecionado
                             ? Colors.white
-                            : !pertenceAoMes || estahDesabilitado
-                                ? AppColors.bordaCampo
-                                : AppColors.textoEscuro,
+                            : !pertenceAoMes || estaDesabilitado
+                            ? AppColors.bordaCampo
+                            : AppColors.textoEscuro,
                       ),
                     ),
                   ),

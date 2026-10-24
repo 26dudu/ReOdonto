@@ -234,7 +234,7 @@ class ApiService {
   // ----------------------------------------------------------------
   // CRIAR AGENDAMENTO — POST /agendamentos/
   // O app é usado só pelo dentista, então quem chega aqui é sempre um
-  // paciente sem conta (nome + telefone), tipo de consulta e data/hora.
+  // paciente sem conta (nome + telefone), tipo de consulta (texto livre) e data/hora.
   //
   // TODO(backend): `clinicaId` ficou opcional porque ainda não existe
   // vínculo dentista→clínica no backend. Assim que existir, o ideal é o
@@ -243,7 +243,6 @@ class ApiService {
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> criarAgendamento({
     required int dentistaId,
-    int? consultaId,
     required String dataHora, // ISO 8601: "2025-08-15T14:00:00"
     required String nomePaciente,
     required String telefonePaciente,
@@ -257,7 +256,6 @@ class ApiService {
             headers: _headersAuth,
             body: jsonEncode({
               'dentista_id': dentistaId,
-              if (consultaId != null) 'consulta_id': consultaId,
               'data_hora': dataHora,
               'nome_paciente': nomePaciente,
               'telefone_paciente': telefonePaciente,
@@ -426,27 +424,6 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // LISTAR CONSULTAS — GET /consultas/
-  // ----------------------------------------------------------------
-  static Future<ApiResultado<List<dynamic>>> listarConsultas() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$_baseUrl/consultas/'), headers: _headersAuth)
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return ApiResultado.sucesso(jsonDecode(response.body) as List<dynamic>);
-      }
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return ApiResultado.falha(body['erro'] ?? 'Erro ao listar consultas');
-    } on SocketException {
-      return const ApiResultado.falha('Sem conexão com o servidor.');
-    } catch (e) {
-      return ApiResultado.falha('Erro inesperado: $e');
-    }
-  }
-
-  // ----------------------------------------------------------------
   // BUSCAR PERFIL DENTISTA — GET /dentistas/<id>
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> buscarPerfil(int id) async {
@@ -523,6 +500,41 @@ class ApiService {
       return ApiResultado.falha(body['erro'] ?? 'Erro ao deletar conta');
     } on SocketException {
       return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // LOGIN GOOGLE — POST /auth/google/verify-token
+  // Envia o idToken (web) ou accessToken (mobile) obtido pelo
+  // GoogleSignIn para o backend verificar e retornar um JWT próprio.
+  // Retorna { token, paciente, google_auth: true }
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> loginGoogle({
+    String? idToken,
+    String? accessToken,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl/auth/google/verify-token'),
+            headers: _headersPublicos,
+            body: jsonEncode({
+              if (idToken != null) 'id_token': idToken,
+              if (accessToken != null) 'access_token': accessToken,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao autenticar com Google');
+    } on SocketException {
+      return const ApiResultado.falha(
+          'Sem conexão com o servidor. Verifique se o backend está rodando.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
     } catch (e) {
       return ApiResultado.falha('Erro inesperado: $e');
     }

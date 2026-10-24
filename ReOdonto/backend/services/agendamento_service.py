@@ -1,7 +1,6 @@
 from database.db import db
 from models.agendamento_model import Agendamento
 from models.dentista_model import Dentista
-from models.consulta_model import Consulta
 from models.clinica_model import Clinica
 from datetime import datetime, timedelta
 
@@ -11,7 +10,7 @@ def criar_agendamento(data):
     Cria um novo agendamento.
 
     Campos obrigatórios: dentista_id, data_hora
-    Opcionais: clinica_id, consulta_id OU consulta_customizada,
+    Opcionais: clinica_id, consulta_customizada,
                nome_paciente, telefone_paciente
     """
     if not data.get('dentista_id'):
@@ -22,11 +21,6 @@ def criar_agendamento(data):
     # Valida dentista
     if not db.session.get(Dentista, data['dentista_id']):
         raise ValueError(f"Dentista {data['dentista_id']} não encontrado")
-
-    # Valida consulta (se fornecida)
-    consulta_id = data.get('consulta_id')
-    if consulta_id and not db.session.get(Consulta, consulta_id):
-        raise ValueError(f"Consulta {consulta_id} não encontrada")
 
     # Valida clínica (se fornecida)
     clinica_id = data.get('clinica_id')
@@ -54,7 +48,6 @@ def criar_agendamento(data):
     agendamento = Agendamento(
         dentista_id=data['dentista_id'],
         clinica_id=clinica_id,
-        consulta_id=consulta_id,
         consulta_customizada=data.get('consulta_customizada'),
         nome_paciente=data.get('nome_paciente'),
         telefone_paciente=data.get('telefone_paciente'),

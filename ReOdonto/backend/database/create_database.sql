@@ -48,21 +48,12 @@ CREATE TABLE IF NOT EXISTS clinica (
     estado  VARCHAR(2)
 );
 
--- Consulta (tipo de procedimento)
-CREATE TABLE IF NOT EXISTS consulta (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome             VARCHAR(100) NOT NULL,
-    descricao        TEXT         NOT NULL,
-    valor            REAL         NOT NULL,
-    duracao_minutos  INTEGER
-);
-
--- Agendamento: relaciona paciente × dentista × consulta × clínica
+-- Agendamento: relaciona paciente × dentista × clínica
 CREATE TABLE IF NOT EXISTS agendamento (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     paciente_id INTEGER NOT NULL REFERENCES paciente(id),
     dentista_id INTEGER NOT NULL REFERENCES dentista(id),
-    consulta_id INTEGER NOT NULL REFERENCES consulta(id),
+    consulta_customizada VARCHAR(200),  -- tipo de consulta em texto livre
     clinica_id  INTEGER NOT NULL REFERENCES clinica(id),
     data_hora   DATETIME NOT NULL,
     status      VARCHAR(20) NOT NULL DEFAULT 'agendado'

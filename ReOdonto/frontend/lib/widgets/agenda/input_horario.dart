@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../theme/app_colors.dart';
 
+
 class InputHorario extends StatefulWidget {
+  // Horário atualmente selecionado (vem de fora, do widget pai). Pode ser
+  // nulo se o usuário ainda não escolheu nenhum horário.
   final TimeOfDay? horarioSelecionado;
+
+  // Callback chamado sempre que hora ou minuto mudam, avisando o widget
+  // pai qual horário foi escolhido.
   final ValueChanged<TimeOfDay> onHorarioSelecionado;
 
   const InputHorario({
@@ -17,47 +22,65 @@ class InputHorario extends StatefulWidget {
 }
 
 class _InputHorarioState extends State<InputHorario> {
-  late TextEditingController _controladorHorario;
+  // Lista fixa de minutos permitidos: intervalos de 15 em 15.
+  // Se um dia precisar mudar pra 30 em 30, basta trocar essa lista
+  // para [0, 30].
+  static const List<int> _minutosPermitidos = [0, 15, 30, 45];
+
+  // Hora e minuto atualmente escolhidos nos dropdowns. Começam nulos
+  // (nada selecionado) a não ser que já venha um horário de fora.
+  int? _horaSelecionada;
+  int? _minutoSelecionado;
 
   @override
   void initState() {
     super.initState();
-    final horario = widget.horarioSelecionado ?? const TimeOfDay(hour: 9, minute: 0);
-    _controladorHorario = TextEditingController(
-      text: '${horario.hour.toString().padLeft(2, '0')}:${horario.minute.toString().padLeft(2, '0')}',
-    );
+    // Se já existe um horário vindo do widget pai, pré-seleciona os
+    // dropdowns com ele.
+    _horaSelecionada = widget.horarioSelecionado?.hour;
+    _minutoSelecionado = widget.horarioSelecionado?.minute;
   }
 
-  @override
-  void dispose() {
-    _controladorHorario.dispose();
-    super.dispose();
-  }
-
-  void _validarEEmitirHorario() {
-    final texto = _controladorHorario.text;
-    
-    // Extrai hora e minuto
-    final partes = texto.split(':');
-    if (partes.length != 2) return;
-
-    final hora = int.tryParse(partes[0]) ?? 0;
-    final minuto = int.tryParse(partes[1]) ?? 0;
-
-    // Validação
-    if (hora < 0 || hora > 23 || minuto < 0 || minuto > 59) {
-      return;
+  // Chamado sempre que a hora ou o minuto mudam num dos dropdowns.
+  // Só emite o horário completo pro widget pai quando os dois já
+  // estiverem preenchidos.
+  void _atualizarHorario() {
+    if (_horaSelecionada != null && _minutoSelecionado != null) {
+      widget.onHorarioSelecionado(
+        TimeOfDay(hour: _horaSelecionada!, minute: _minutoSelecionado!),
+      );
     }
+  }
 
-    // Emite o horário
-    widget.onHorarioSelecionado(TimeOfDay(hour: hora, minute: minuto));
+  // Decoração compartilhada pelos dois dropdowns, pra manter o mesmo
+  // visual (borda, preenchimento, etc) usado no resto do formulário.
+  InputDecoration _decoracaoDropdown(String label) {
+    return InputDecoration(
+      labelText: label,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.bordaCampo),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.bordaCampo),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.azulPrimario, width: 2),
+      ),
+      filled: true,
+      fillColor: AppColors.preenchimentoCampo,
+      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start, // alinha tudo à esquerda
       children: [
+        // Rótulo fixo acima dos dropdowns.
         const Text(
           'Horário',
           style: TextStyle(
@@ -66,62 +89,75 @@ class _InputHorarioState extends State<InputHorario> {
             color: AppColors.textoEscuro,
           ),
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _controladorHorario,
-          keyboardType: TextInputType.text,
-          textAlign: TextAlign.center,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'[0-9:]')),
-            LengthLimitingTextInputFormatter(5),
+        const SizedBox(height: 12), // espaçamento vertical
+
+        Row(
+          children: [
+            // ---- Dropdown de hora (0 a 23) ----
+            Expanded(
+              child: DropdownButtonFormField<int>(
+                value: _horaSelecionada,
+                isExpanded: true,
+                decoration: _decoracaoDropdown('Hora'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textoEscuro,
+                ),
+                hint: const Text('--'),
+                // Gera as opções de 0 a 23, formatadas com 2 dígitos (ex: "08").
+                items: List.generate(24, (h) => h)
+                    .map(
+                      (h) => DropdownMenuItem(
+                        value: h,
+                        child: Text(h.toString().padLeft(2, '0')),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (valor) {
+                  setState(() => _horaSelecionada = valor);
+                  _atualizarHorario();
+                },
+              ),
+            ),
+            const SizedBox(width: 12), // espaçamento entre os dois dropdowns
+
+            // Dropdown de minuto (limitado aos intervalos permitidos
+            Expanded(
+              child: DropdownButtonFormField<int>(
+                value: _minutoSelecionado,
+                isExpanded: true,
+                decoration: _decoracaoDropdown('Minuto'),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textoEscuro,
+                ),
+                hint: const Text('--'),
+                // Usa a lista fixa de minutos permitidos (0, 15, 30, 45).
+                items: _minutosPermitidos
+                    .map(
+                      (m) => DropdownMenuItem(
+                        value: m,
+                        child: Text(m.toString().padLeft(2, '0')),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (valor) {
+                  setState(() => _minutoSelecionado = valor);
+                  _atualizarHorario();
+                },
+              ),
+            ),
           ],
-          onChanged: (_) => _validarEEmitirHorario(),
-          decoration: InputDecoration(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.bordaCampo,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.bordaCampo,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: AppColors.azulPrimario,
-                width: 2,
-              ),
-            ),
-            filled: true,
-            fillColor: AppColors.preenchimentoCampo,
-            contentPadding: const EdgeInsets.symmetric(
-              vertical: 14,
-              horizontal: 16,
-            ),
-            hintText: 'HH:MM',
-            hintStyle: TextStyle(
-              color: AppColors.textoCinza,
-              fontSize: 16,
-            ),
-          ),
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textoEscuro,
-            letterSpacing: 2,
-          ),
         ),
-        const SizedBox(height: 8),
+
+        const SizedBox(height: 8), 
+
+        // Texto avisando o intervalo permitido.
         Text(
-          'Digite no formato HH:MM (ex: 08:00, 14:30)',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textoCinza,
-          ),
+          'Horários disponíveis de 15 em 15 minutos',
+          style: TextStyle(fontSize: 12, color: AppColors.textoCinza),
         ),
       ],
     );

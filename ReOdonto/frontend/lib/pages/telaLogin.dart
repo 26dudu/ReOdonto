@@ -47,11 +47,10 @@ class _TelaLoginState extends State<TelaLogin> {
 
     setState(() => _carregando = true);
 
-    // Tenta como dentista primeiro; se falhar, tenta como paciente.
-    var resultado = await ApiService.loginDentista(email: email, senha: senha);
-    if (resultado.temErro) {
-      resultado = await ApiService.login(email: email, senha: senha);
-    }
+    // O app é do dentista. Antes, se o login de dentista falhasse, o app
+    // tentava como paciente — e o paciente entrava numa agenda em que toda
+    // chamada é recusada (as rotas exigem token de dentista).
+    final resultado = await ApiService.loginDentista(email: email, senha: senha);
 
     if (!mounted) return;
     setState(() => _carregando = false);

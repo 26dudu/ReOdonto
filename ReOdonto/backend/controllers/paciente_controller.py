@@ -6,6 +6,7 @@ from flask_jwt_extended import (
     get_jwt,
 )
 import services.paciente_service as service
+from controllers import recuperacao_rotas
 
 paciente_bp = Blueprint('paciente', __name__, url_prefix='/pacientes')
 
@@ -15,6 +16,24 @@ def _json_ou_erro():
     if data is None:
         return None, (jsonify({'erro': 'Body deve ser JSON válido com Content-Type: application/json'}), 400)
     return data, None
+
+
+def _negar_se_nao_for_o_dono(id):
+    """
+    Devolve 403 quando o token não é de um paciente ou não é o dono do id.
+
+    A checagem de tipo é necessária porque o 'sub' de um token de dentista é
+    o id do dentista: sem ela, o dentista de id N acessava o paciente de id N.
+    """
+    claims = get_jwt()
+    if claims.get('tipo') != 'paciente':
+        return jsonify({'erro': 'Acesso negado'}), 403
+    try:
+        if int(get_jwt_identity()) != id:
+            return jsonify({'erro': 'Acesso negado'}), 403
+    except (TypeError, ValueError):
+        return jsonify({'erro': 'Acesso negado'}), 403
+    return None
 
 
 @paciente_bp.route('/', methods=['POST'])
@@ -81,9 +100,9 @@ def login():
 @jwt_required()
 def buscar(id):
     """Paciente só pode ver o próprio perfil."""
-    paciente_logado = int(get_jwt_identity())
-    if id != paciente_logado:
-        return jsonify({'erro': 'Acesso negado'}), 403
+    negado = _negar_se_nao_for_o_dono(id)
+    if negado:
+        return negado
     return jsonify(service.buscar_paciente(id).to_dict())
 
 
@@ -91,9 +110,9 @@ def buscar(id):
 @jwt_required()
 def atualizar(id):
     """Paciente só pode editar o próprio perfil."""
-    paciente_logado = int(get_jwt_identity())
-    if id != paciente_logado:
-        return jsonify({'erro': 'Acesso negado'}), 403
+    negado = _negar_se_nao_for_o_dono(id)
+    if negado:
+        return negado
 
     data, erro = _json_ou_erro()
     if erro:
@@ -109,63 +128,13 @@ def atualizar(id):
 @jwt_required()
 def deletar(id):
     """Paciente só pode deletar a própria conta."""
-    paciente_logado = int(get_jwt_identity())
-    if id != paciente_logado:
-        return jsonify({'erro': 'Acesso negado'}), 403
+    negado = _negar_se_nao_for_o_dono(id)
+    if negado:
+        return negado
     service.deletar_paciente(id)
     return '', 204
 
 
-@paciente_bp.route('/recuperar-senha', methods=['POST'])
-def recuperar_senha():
-    """
-    Solicita recuperação de senha. Rota pública.
-    Body: { "email": "..." }
-
-    Retorno:
-    - 200: Email existe e código foi enviado
-    - 404: Email não está cadastrado
-    - 400: Email inválido
-    - 500: Erro interno ao processar
-    """
-    data, erro = _json_ou_erro()
-    if erro:
-        return erro
-
-    email = data.get('email', '').strip()
-    if not email or '@' not in email:
-        return jsonify({'erro': 'Email inválido'}), 400
-
-    try:
-        encontrado = service.solicitar_recuperacao_senha(email)
-
-        if not encontrado:
-            return jsonify({'erro': 'Email não encontrado no banco de dados'}), 404
-
-        return jsonify({'mensagem': 'Código de verificação enviado. Verifique seu email.'}), 200
-    except Exception:
-        return jsonify({'erro': 'Erro ao processar solicitação'}), 500
-
-
-@paciente_bp.route('/redefinir-senha', methods=['POST'])
-def redefinir_senha():
-    """
-    Redefine a senha com o código OTP. Rota pública.
-    Body: { "email": "...", "codigo": "123456", "nova_senha": "..." }
-    """
-    data, erro = _json_ou_erro()
-    if erro:
-        return erro
-
-    email = data.get('email', '').strip()
-    codigo = data.get('codigo', '').strip()
-    nova_senha = data.get('nova_senha', '')
-
-    if not email or not codigo or not nova_senha:
-        return jsonify({'erro': 'Campos email, codigo e nova_senha são obrigatórios'}), 400
-
-    try:
-        service.redefinir_senha(email, codigo, nova_senha)
-        return jsonify({'mensagem': 'Senha redefinida com sucesso'}), 200
-    except ValueError as e:
-        return jsonify({'erro': str(e)}), 400
+# /pacientes/recuperar-senha e /pacientes/redefinir-senha — os handlers são
+# os mesmos usados em /dentistas e atendem os dois tipos de conta.
+recuperacao_rotas.registrar(paciente_bp)

@@ -7,8 +7,11 @@ Fluxo:
 3. Google redireciona para /auth/google/callback com código
 4. Backend troca código por token Google
 5. Backend obtém user_info do Google
-6. Backend cria ou atualiza paciente no banco
-7. Backend retorna JWT + dados do paciente para o frontend
+6. Backend encontra (ou cria) o DENTISTA com esse email
+7. Backend retorna JWT + dados do dentista, no mesmo formato de /dentistas/login
+
+Antes este fluxo criava um paciente. Como o app é do dentista e as rotas da
+agenda exigem token de dentista, quem entrava pelo Google não via nada.
 
 SETUP NO GOOGLE CONSOLE:
 1. Vá para https://console.cloud.google.com
@@ -17,20 +20,26 @@ SETUP NO GOOGLE CONSOLE:
 4. Crie credenciais OAuth 2.0 (tipo: Web application)
    - URIs autorizados: http://localhost:5000
    - URIs de redirecionamento autorizados: http://localhost:5000/auth/google/callback
-5. Baixe client_secret.json e salve em backend/
-6. Atualize CLIENT_ID, CLIENT_SECRET e REDIRECT_URI abaixo se necessário
+5. Coloque GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET no .env (preferido) ou
+   salve client_secret.json em backend/ — esse arquivo está no .gitignore e
+   NUNCA deve ser commitado.
+6. Se o app mobile usar client IDs próprios (Android/iOS), liste-os em
+   GOOGLE_ALLOWED_CLIENT_IDS, separados por vírgula.
 """
 
 import json
 import os
 import logging
-from flask import Blueprint, request, jsonify, redirect, url_for, session
+import secrets
+from flask import Blueprint, request, jsonify, redirect, session
 from flask_jwt_extended import create_access_token
 from requests_oauthlib import OAuth2Session
-import google.oauth2.service_account
 from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-import services.paciente_service as paciente_service
+import requests
+from sqlalchemy import func
+
+import services.dentista_service as dentista_service
+from models.dentista_model import Dentista
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +80,93 @@ if not CLIENT_ID or not CLIENT_SECRET:
             logger.warning('client_secret.json não encontrado. Configure GOOGLE_CLIENT_ID e GOOGLE_CLIENT_SECRET.')
     except Exception as e:
         logger.error(f'Erro ao carregar client_secret.json: {e}')
+
+
+def _client_ids_aceitos():
+    """Client IDs cujos tokens este backend aceita (web + mobile)."""
+    extras = os.environ.get('GOOGLE_ALLOWED_CLIENT_IDS', '')
+    ids = {i.strip() for i in extras.split(',') if i.strip()}
+    if CLIENT_ID:
+        ids.add(CLIENT_ID)
+    return ids
+
+
+def _validar_access_token(access_token_str):
+    """
+    Confere se o access token foi emitido PARA ESTE APP e devolve os dados
+    do usuário, ou None.
+
+    Antes o backend só chamava o /userinfo: qualquer access token do Google,
+    emitido para qualquer outro app, era aceito — quem tivesse o token de um
+    usuário em outro serviço conseguia entrar no ReOdonto como ele.
+    """
+    resposta = requests.get(
+        'https://oauth2.googleapis.com/tokeninfo',
+        params={'access_token': access_token_str},
+        timeout=10,
+    )
+    if resposta.status_code != 200:
+        logger.warning('tokeninfo recusou o access token: %s', resposta.text)
+        return None
+
+    info = resposta.json()
+    audiencia = info.get('aud') or info.get('azp')
+    if audiencia not in _client_ids_aceitos():
+        logger.warning('Access token emitido para outro client_id: %s', audiencia)
+        return None
+
+    # O nome não vem no tokeninfo; busca no userinfo com o token já validado.
+    perfil = requests.get(
+        GOOGLE_USERINFO_URL,
+        headers={'Authorization': f'Bearer {access_token_str}'},
+        timeout=10,
+    )
+    if perfil.status_code == 200:
+        info.update(perfil.json())
+    return info
+
+
+def _email_verificado(info):
+    valor = info.get('email_verified', info.get('verified_email'))
+    return valor is True or str(valor).lower() == 'true'
+
+
+def _entrar_como_dentista(email, nome):
+    """
+    Encontra o dentista pelo email (ou cria um) e devolve a resposta de login.
+
+    A conta criada recebe uma senha aleatória — quem entra pelo Google não usa
+    senha, mas pode definir uma depois pela recuperação de senha. Isso não abre
+    nada novo: o cadastro de dentista em POST /dentistas/ já é público.
+    """
+    dentista = Dentista.query.filter(
+        func.lower(Dentista.email) == email.strip().lower()
+    ).first()
+    if dentista:
+        logger.info('Dentista existente entrou com Google: %s', email)
+    else:
+        dentista = dentista_service.criar_dentista({
+            'nome': nome,
+            'email': email,
+            'senha': secrets.token_urlsafe(16),
+        })
+        logger.info('Dentista criado via Google: %s', email)
+
+    token = create_access_token(
+        identity=str(dentista.id),
+        additional_claims={
+            'nome': dentista.nome,
+            'email': dentista.email,
+            'tipo': 'dentista',
+            'dentista_id': dentista.id,
+            'google_auth': True,
+        },
+    )
+    return jsonify({
+        'token': token,
+        'dentista': dentista.to_dict(),
+        'google_auth': True,
+    }), 200
 
 
 @google_auth_bp.route('/login', methods=['GET'])
@@ -146,66 +242,20 @@ def callback():
         # Obtém os dados do usuário
         user_info = google.get(GOOGLE_USERINFO_URL).json()
 
-        logger.info(f'Usuário Google autenticado: {user_info.get("email")}')
-
-        # Processa o usuário no banco
         email = user_info.get('email')
         nome = user_info.get('name', 'Usuário Google')
-        foto = user_info.get('picture')
+        if not email or not _email_verificado(user_info):
+            return jsonify({'erro': 'O Google não confirmou o email desta conta'}), 401
 
-        # Tenta buscar paciente por email
-        try:
-            paciente = paciente_service.buscar_paciente_por_email(email)
-            logger.info(f'Paciente existente: {email}')
-        except ValueError:
-            # Paciente não existe — cria um novo
-            # Senha é gerada aleatoriamente (usuário não usa senha com Google)
-            import secrets
-            senha_temporaria = secrets.token_urlsafe(16)
+        logger.info('Usuario Google autenticado: %s', email)
 
-            paciente_data = {
-                'nome': nome,
-                'email': email,
-                'senha': senha_temporaria,
-                'telefone': None,
-                'cpf': None,
-                'cep': None,
-                'rua': None,
-                'bairro': None,
-                'numero': None,
-            }
-            paciente = paciente_service.criar_paciente(paciente_data)
-            logger.info(f'Novo paciente criado: {email}')
+        # O state já foi usado; o token do Google não é guardado no cookie de
+        # sessão (o cookie do Flask é assinado, mas legível pelo cliente).
+        session.pop('oauth_state', None)
 
-        # Gera JWT para o frontend
-        paciente_dict = paciente.to_dict()
-        additional_claims = {
-            'nome': paciente_dict.get('nome'),
-            'email': paciente_dict.get('email'),
-            'tipo': 'paciente',
-            'google_auth': True,
-        }
-        jwt_token = create_access_token(
-            identity=str(paciente.id),
-            additional_claims=additional_claims,
-        )
-
-        # Salva dados na sessão para posterior uso
-        session['oauth_token'] = token
-        session['user_id'] = paciente.id
-        session['user_email'] = email
-        session['user_name'] = nome
-        session['user_picture'] = foto
-        session['user_logged_in'] = True
-
-        # Retorna o JWT ao frontend
         # Em uma app real, você redirecionaria para o frontend com o token na URL
         # Por exemplo: return redirect(f"myapp://login?token={jwt_token}")
-        return jsonify({
-            'token': jwt_token,
-            'paciente': paciente_dict,
-            'google_auth': True,
-        }), 200
+        return _entrar_como_dentista(email, nome)
 
     except Exception as e:
         logger.error(f'Erro no callback Google: {str(e)}', exc_info=True)
@@ -240,84 +290,38 @@ def verify_token():
         if id_token_str:
             try:
                 from google.auth.transport.requests import Request as GoogleRequest
+                # A verificação confere assinatura, expiração e audiência.
                 token_info = id_token.verify_oauth2_token(
                     id_token_str,
                     GoogleRequest(),
-                    CLIENT_ID,
+                    list(_client_ids_aceitos()),
                 )
-                if token_info.get('aud') != CLIENT_ID:
-                    raise ValueError('Token não é para este aplicativo')
                 logger.info('ID token verificado com sucesso')
             except Exception as e:
                 logger.warning(f'ID token inválido, tentando com accessToken: {e}')
                 token_info = None
         
-        # Se ID token falhou ou não existe, usa accessToken (mobile)
+        # Se ID token falhou ou não existe, usa accessToken (mobile) — mas só
+        # depois de conferir que ele foi emitido para este app.
         if not token_info and access_token_str:
-            import requests
-            response = requests.get(
-                'https://www.googleapis.com/oauth2/v2/userinfo',
-                headers={'Authorization': f'Bearer {access_token_str}'},
-                timeout=10
-            )
-            if response.status_code != 200:
-                logger.error(f'Erro ao buscar user info: {response.text}')
+            token_info = _validar_access_token(access_token_str)
+            if not token_info:
                 return jsonify({'erro': 'Token inválido'}), 401
-            token_info = response.json()
-            logger.info('User info obtido via accessToken com sucesso')
-        
+            logger.info('Access token validado com sucesso')
+
         if not token_info:
             return jsonify({'erro': 'Nenhum token válido fornecido'}), 401
-        
+
         email = token_info.get('email')
         nome = token_info.get('name', 'Usuário Google')
-        
+
         if not email:
             return jsonify({'erro': 'Email não fornecido pelo Google'}), 400
-        
-        logger.info(f'Token Google verificado para: {email}')
-        
-        # Processa o usuário no banco
-        try:
-            paciente = paciente_service.buscar_paciente_por_email(email)
-            logger.info(f'Paciente existente: {email}')
-        except ValueError:
-            # Paciente não existe — cria um novo
-            import secrets
-            senha_temporaria = secrets.token_urlsafe(16)
-            
-            paciente_data = {
-                'nome': nome,
-                'email': email,
-                'senha': senha_temporaria,
-                'telefone': None,
-                'cpf': None,
-                'cep': None,
-                'rua': None,
-                'bairro': None,
-                'numero': None,
-            }
-            paciente = paciente_service.criar_paciente(paciente_data)
-            logger.info(f'Novo paciente criado: {email}')
-        
-        # Gera JWT para o frontend
-        paciente_dict = paciente.to_dict()
-        additional_claims = {
-            'nome': paciente_dict.get('nome'),
-            'email': paciente_dict.get('email'),
-            'tipo': 'paciente',
-            'google_auth': True,
-        }
-        jwt_token = create_access_token(
-            identity=str(paciente.id),
-            additional_claims=additional_claims,
-        )
-        
-        return jsonify({
-            'token': jwt_token,
-            'paciente': paciente_dict,
-            'google_auth': True,
-        }), 200
+        if not _email_verificado(token_info):
+            return jsonify({'erro': 'O Google não confirmou o email desta conta'}), 401
+
+        logger.info('Token Google verificado para: %s', email)
+        return _entrar_como_dentista(email, nome)
         
     except Exception as e:
         logger.error(f'Erro ao verificar token: {str(e)}', exc_info=True)

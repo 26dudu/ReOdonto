@@ -1,7 +1,12 @@
 import re
 import bcrypt
+from sqlalchemy import func
 from database.db import db
 from models.dentista_model import Dentista
+
+# Mesmo mínimo que o app já exige em validadores.dart — antes o backend
+# aceitava 6, deixando a regra mais fraca que a da tela de cadastro.
+MIN_CARACTERES_SENHA = 8
 
 
 def _hash_senha(senha: str) -> str:
@@ -50,10 +55,15 @@ def criar_dentista(data):
             raise ValueError(f'Campo obrigatório ausente: {campo}')
 
     # Valida senha mínima
-    if len(data['senha']) < 6:
-        raise ValueError('A senha deve ter pelo menos 6 caracteres')
+    if len(data['senha']) < MIN_CARACTERES_SENHA:
+        raise ValueError(
+            f'A senha deve ter pelo menos {MIN_CARACTERES_SENHA} caracteres'
+        )
 
-    if Dentista.query.filter_by(email=data['email']).first():
+    # Comparação sem diferenciar maiúsculas: email não é case-sensitive, e
+    # antes "Joao@x.com" e "joao@x.com" podiam coexistir como contas distintas.
+    email = data['email'].strip()
+    if Dentista.query.filter(func.lower(Dentista.email) == email.lower()).first():
         raise ValueError('Email já cadastrado')
 
     # Processa CPF ou CNPJ
@@ -75,7 +85,7 @@ def criar_dentista(data):
 
     dentista = Dentista(
         nome=data['nome'],
-        email=data['email'],
+        email=email,
         senha=_hash_senha(data['senha']),
         telefone=data.get('telefone'),
         cro=data.get('cro'),
@@ -87,7 +97,9 @@ def criar_dentista(data):
 
 
 def login_dentista(email: str, senha: str) -> Dentista:
-    dentista = Dentista.query.filter_by(email=email).first()
+    dentista = Dentista.query.filter(
+        func.lower(Dentista.email) == (email or '').strip().lower()
+    ).first()
     if not dentista or not _verificar_senha(senha, dentista.senha):
         raise ValueError('Email ou senha inválidos')
     return dentista
@@ -116,9 +128,13 @@ def buscar_dentista(id):
 def atualizar_dentista(id, data):
     dentista = db.get_or_404(Dentista, id)
 
-    novo_email = data.get('email')
-    if novo_email and novo_email != dentista.email:
-        if Dentista.query.filter_by(email=novo_email).first():
+    novo_email = (data.get('email') or '').strip()
+    if novo_email and novo_email.lower() != dentista.email.lower():
+        em_uso = Dentista.query.filter(
+            func.lower(Dentista.email) == novo_email.lower(),
+            Dentista.id != dentista.id,
+        ).first()
+        if em_uso:
             raise ValueError('Email já está em uso')
         dentista.email = novo_email
 
@@ -142,7 +158,18 @@ def atualizar_dentista(id, data):
             if Dentista.query.filter_by(cpf_cnpj=novo).first():
                 raise ValueError('CPF/CNPJ já está em uso')
             dentista.cpf_cnpj = novo
+    # Troca de senha pelo perfil exige a senha atual: só o token não basta,
+    # senão um token vazado permitiria tomar a conta trocando a senha.
     if data.get('senha'):
+        senha_atual = data.get('senha_atual')
+        if not senha_atual:
+            raise ValueError('Informe a senha atual para definir uma nova senha')
+        if not _verificar_senha(senha_atual, dentista.senha):
+            raise ValueError('Senha atual incorreta')
+        if len(data['senha']) < MIN_CARACTERES_SENHA:
+            raise ValueError(
+                f'A nova senha deve ter pelo menos {MIN_CARACTERES_SENHA} caracteres'
+            )
         dentista.senha = _hash_senha(data['senha'])
 
     db.session.commit()
@@ -150,6 +177,16 @@ def atualizar_dentista(id, data):
 
 
 def deletar_dentista(id):
+    """
+    Apaga o dentista e os agendamentos dele.
+
+    O PRAGMA foreign_keys=ON do SQLite recusa apagar um dentista que ainda
+    tem agendamentos, então a exclusão falhava com erro 500 em vez de
+    funcionar. Os agendamentos saem primeiro, na mesma transação.
+    """
+    from models.agendamento_model import Agendamento
+
     dentista = db.get_or_404(Dentista, id)
+    Agendamento.query.filter_by(dentista_id=id).delete(synchronize_session=False)
     db.session.delete(dentista)
     db.session.commit()

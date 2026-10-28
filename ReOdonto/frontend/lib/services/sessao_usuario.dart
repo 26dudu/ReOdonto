@@ -19,6 +19,13 @@ class SessaoUsuario {
   //          { "token": "...", "dentista":  {...} }
   // -------------------------------------------------------------------
   static Future<void> salvar(Map<String, dynamic> resposta) async {
+    // Zera a sessão anterior: o fallback abaixo usa `??=`, e sem isto o nome
+    // ou o tipo de quem estava logado antes podia sobrar na sessão nova.
+    id = null;
+    nome = null;
+    email = null;
+    tipo = null;
+
     token = resposta['token'] as String?;
 
     // Dentista

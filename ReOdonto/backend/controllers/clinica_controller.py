@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 import services.clinica_service as service
+from utils.auth import dentista_required
 
 clinica_bp = Blueprint('clinica', __name__, url_prefix='/clinicas')
 
@@ -38,10 +39,13 @@ def buscar(id):
     return jsonify(service.buscar_clinica(id).to_dict())
 
 
-# --- Rotas de escrita — requerem login ---
+# --- Rotas de escrita — restritas a dentistas ---
+# Clínica é cadastro da operação, não do paciente: antes qualquer conta
+# autenticada (inclusive um paciente recém-cadastrado) podia criar, editar
+# e apagar clínicas.
 
 @clinica_bp.route('/', methods=['POST'])
-@jwt_required()
+@dentista_required
 def criar():
     data, erro = _json_ou_erro()
     if erro:
@@ -54,7 +58,7 @@ def criar():
 
 
 @clinica_bp.route('/<int:id>', methods=['PUT'])
-@jwt_required()
+@dentista_required
 def atualizar(id):
     data, erro = _json_ou_erro()
     if erro:
@@ -67,7 +71,7 @@ def atualizar(id):
 
 
 @clinica_bp.route('/<int:id>', methods=['DELETE'])
-@jwt_required()
+@dentista_required
 def deletar(id):
     service.deletar_clinica(id)
     return '', 204

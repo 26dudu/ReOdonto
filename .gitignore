@@ -7,6 +7,14 @@
 *.env
 !.env.example
 
+# Credenciais OAuth e afins — NUNCA commitar
+client_secret.json
+client_secret*.json
+credentials.json
+service-account*.json
+*.pem
+*.key
+
 # Banco de dados SQLite local
 *.db
 *.db-journal

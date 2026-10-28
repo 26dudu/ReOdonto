@@ -1,5 +1,16 @@
 import '../utils/formatadores.dart';
 
+/// Status exatamente como o backend envia.
+///
+/// Antes o app esperava 'Confirmado' / 'Pendente', que o backend nunca
+/// mandou: ele usa 'agendado', 'concluido' e 'cancelado'. Por isso o botão
+/// "Confirmar Atendimento" nunca aparecia e toda bolinha ficava laranja.
+class StatusAgendamento {
+  static const agendado = 'agendado';
+  static const concluido = 'concluido';
+  static const cancelado = 'cancelado';
+}
+
 class Agendamento {
   final int? id;
   final String? paciente;
@@ -11,8 +22,17 @@ class Agendamento {
   /// Nome do procedimento (ex.: "Limpeza Dental").
   final String? tipoConsulta;
 
+  /// Valor do horário em R$ (campo `consulta_valor` da API).
   final double? preco;
-  final String? status; // 'Confirmado' ou 'Pendente'
+
+  /// Duração em minutos.
+  final int? duracaoMinutos;
+
+  /// true quando o horário estava vago e foi preenchido por um encaixe.
+  final bool encaixe;
+
+  /// Um dos valores de [StatusAgendamento], em minúsculas como na API.
+  final String? status;
 
   const Agendamento({
     this.id,
@@ -21,26 +41,35 @@ class Agendamento {
     this.dataHora,
     this.tipoConsulta,
     this.preco,
+    this.duracaoMinutos,
+    this.encaixe = false,
     this.status,
   });
 
   bool get vago => paciente == null;
 
-  /// "28/09" — calculado a partir do dataHora (antes era um campo guardado).
+  bool get concluido => status == StatusAgendamento.concluido;
+
+  /// Agendado com paciente: pode ser confirmado como atendido ou cancelado.
+  bool get emAberto => !vago && status == StatusAgendamento.agendado;
+
+  /// Texto da pílula de status.
+  String get rotuloStatus {
+    switch (status) {
+      case StatusAgendamento.concluido:
+        return 'Concluído';
+      case StatusAgendamento.cancelado:
+        return 'Cancelado';
+      default:
+        return encaixe ? 'Encaixe' : 'Agendado';
+    }
+  }
+
+  /// "28/09" — calculado a partir do dataHora.
   String get dia => dataHora == null ? '' : formatarDataCurta(dataHora!);
 
-  /// "14:30" — calculado a partir do dataHora (antes era um campo guardado).
+  /// "14:30" — calculado a partir do dataHora.
   String get horario => dataHora == null ? '' : formatarHora(dataHora!);
-
-  Agendamento copyWith({String? status}) => Agendamento(
-        id: id,
-        paciente: paciente,
-        avaliacaoPaciente: avaliacaoPaciente,
-        dataHora: dataHora,
-        tipoConsulta: tipoConsulta,
-        preco: preco,
-        status: status ?? this.status,
-      );
 
   factory Agendamento.fromJson(Map<String, dynamic> json) {
     // tryParse não lança erro se o texto for inválido: devolve null.
@@ -53,14 +82,11 @@ class Agendamento {
       dataHora: dataHora,
       tipoConsulta: json['consulta_nome'] as String?,
       preco: (json['consulta_valor'] as num?)?.toDouble(),
-      status: capitalizar(json['status'] as String?),
+      duracaoMinutos: (json['duracao_minutos'] as num?)?.toInt(),
+      encaixe: json['encaixe'] == true,
+      status: (json['status'] as String?)?.toLowerCase(),
     );
   }
-}
-
-String? capitalizar(String? valor) {
-  if (valor == null || valor.isEmpty) return valor;
-  return valor[0].toUpperCase() + valor.substring(1).toLowerCase();
 }
 
 /// 200.0 -> "R$ 200,00" (usa o intl).

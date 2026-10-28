@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import '../../models/agendamento.dart';
 import '../../theme/app_colors.dart';
 
-// Cartão de um agendamento. O botão depende do estado:
-//   vago -> "Agendar Paciente" | Pendente -> "Confirmar Atendimento" |
-//   demais -> "Deseja Cancelar?"
+// Cartão de um agendamento. As ações dependem do estado:
+//   vago      -> "Agendar Paciente"
+//   agendado  -> "Confirmar Atendimento" + "Cancelar consulta"
+//   concluído -> sem ações (o backend não permite alterar)
 class CartaoConsulta extends StatelessWidget {
   final Agendamento consulta;
   final VoidCallback? onConfirmar;
@@ -47,8 +48,7 @@ class CartaoConsulta extends StatelessWidget {
             const SizedBox(height: 10),
             _pilulaStatus(),
           ],
-          const SizedBox(height: 12),
-          _botao(),
+          ..._acoes(),
         ],
       ),
     );
@@ -105,12 +105,12 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  /// "Pílula" colorida com o status (Confirmado = verde, resto = laranja).
+  /// "Pílula" colorida com o status (Concluído = verde, resto = laranja).
   Widget _pilulaStatus() {
-    final confirmado = consulta.status == 'Confirmado';
-    final corFundo = confirmado ? AppColors.confirmado : AppColors.pendente;
+    final concluido = consulta.concluido;
+    final corFundo = concluido ? AppColors.confirmado : AppColors.pendente;
     final corTexto =
-        confirmado ? AppColors.confirmadoTexto : AppColors.pendenteTexto;
+        concluido ? AppColors.confirmadoTexto : AppColors.pendenteTexto;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -119,7 +119,7 @@ class CartaoConsulta extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
-        consulta.status ?? 'Pendente',
+        consulta.rotuloStatus,
         style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w700,
@@ -129,19 +129,30 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  Widget _botao() {
-    final String texto;
-    final VoidCallback? aoTocar;
+  List<Widget> _acoes() {
     if (consulta.vago) {
-      texto = 'Agendar Paciente';
-      aoTocar = onAgendar;
-    } else if (consulta.status == 'Pendente') {
-      texto = 'Confirmar Atendimento';
-      aoTocar = onConfirmar;
-    } else {
-      texto = 'Deseja Cancelar?';
-      aoTocar = onCancelar;
+      return [const SizedBox(height: 12), _botao('Agendar Paciente', onAgendar)];
     }
+    if (!consulta.emAberto) return const [];
+    return [
+      const SizedBox(height: 12),
+      _botao('Confirmar Atendimento', onConfirmar),
+      const SizedBox(height: 4),
+      SizedBox(
+        width: double.infinity,
+        child: TextButton(
+          onPressed: onCancelar,
+          style: TextButton.styleFrom(foregroundColor: AppColors.textoCinza),
+          child: const Text(
+            'Cancelar consulta',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _botao(String texto, VoidCallback? aoTocar) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(

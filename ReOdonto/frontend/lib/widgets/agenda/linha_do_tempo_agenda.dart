@@ -70,9 +70,7 @@ class _ItemLinhaDoTempo extends StatelessWidget {
     final vago = agendamento.vago;
     final Color corPonto = vago
         ? Colors.white
-        : (agendamento.status == 'Confirmado'
-            ? AppColors.confirmado
-            : AppColors.pendente);
+        : (agendamento.concluido ? AppColors.confirmado : AppColors.pendente);
 
     // IntrinsicHeight faz o traço vertical esticar até a altura do cartão.
     return IntrinsicHeight(

@@ -125,23 +125,63 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
     if (i != -1) setState(() => _agendamentos[i] = novo);
   }
 
-  // Marca o atendimento como "Confirmado" (só altera na tela, sem chamar a API).
-  void _confirmarAtendimento(Agendamento a) =>
-      _substituir(a, a.copyWith(status: 'Confirmado'));
+  // Marca o atendimento como realizado na API (status "concluido").
+  // Antes só mudava a tela: ao recarregar, a consulta voltava ao estado
+  // anterior e o painel nunca contava a consulta como realizada.
+  Future<void> _confirmarAtendimento(Agendamento a) async {
+    if (a.id == null) return;
 
-  // Cancela a consulta na API e remove da lista.
+    final resultado = await ApiService.concluirAgendamento(a.id!);
+    if (!mounted) return;
+
+    if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
+    _substituir(a, Agendamento.fromJson(resultado.dados!));
+    mostrarAviso(context, 'Atendimento confirmado.');
+  }
+
+  // Cancela a consulta. O backend abre um horário vago no mesmo lugar,
+  // então a agenda é recarregada para ele aparecer pronto para um encaixe.
+  // Antes o item só era removido da lista e o horário vago — razão de ser
+  // do app — nunca surgia.
   Future<void> _cancelarConsulta(Agendamento a) async {
     // Sem id não há como cancelar.
     if (a.id == null) return;
 
-    // Chama a API.
+    final confirmou = await showDialog<bool>(
+      context: context,
+      builder: (contexto) => AlertDialog(
+        title: const Text('Cancelar consulta?'),
+        content: Text(
+          'A consulta de ${a.paciente ?? 'paciente'} às ${a.horario} será '
+          'cancelada e o horário ficará vago para um encaixe.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(contexto, false),
+            child: const Text('Voltar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(contexto, true),
+            child: const Text('Cancelar consulta'),
+          ),
+        ],
+      ),
+    );
+    if (confirmou != true || !mounted) return;
+
     final resultado = await ApiService.cancelarAgendamento(a.id!);
     if (!mounted) return;
 
-    // Erro: avisa e sai.
     if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
-    // Sucesso: remove da lista local todos os itens com esse id.
-    setState(() => _agendamentos.removeWhere((x) => x.id == a.id));
+
+    await _carregarAgendamentos(silencioso: true);
+    if (!mounted) return;
+    mostrarAviso(
+      context,
+      resultado.dados?['horario_liberado'] != null
+          ? 'Consulta cancelada. O horário ficou vago para um encaixe.'
+          : 'Consulta cancelada.',
+    );
   }
 
   // Abre o pop-up para preencher paciente e agenda num horário vago.

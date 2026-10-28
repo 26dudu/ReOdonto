@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/resumo_painel.dart';
+import '../services/api_service.dart';
 import '../services/sessao_usuario.dart';
 import '../theme/app_colors.dart';
+import '../utils/avisos.dart';
 import '../widgets/menu_navegacao.dart';
 import '../widgets/pagina_com_menu.dart';
 import '../widgets/painel/cartao_indicador.dart';
@@ -35,19 +37,26 @@ class _EstadoTelaMenu extends State<TelaMenu> {
       });
     }
 
-    // TODO(backend): trocar por uma chamada à API Python, por exemplo
-    //   final r = await ApiService.buscarResumoPainel(SessaoUsuario.id!);
-    //   if (r.temErro) { setState(() { _carregando = false; _erro = r.erro; }); return; }
-    //   resumo = ResumoPainel.fromJson(r.dados!);
-    // O formato do JSON está documentado em models/resumo_painel.dart.
-
-
-    final resumo = ResumoPainel.vazio();
-
+    // GET /painel/resumo — o formato do JSON está em models/resumo_painel.dart.
+    final r = await ApiService.buscarResumoPainel();
     if (!mounted) return;
+
+    if (r.temErro) {
+      if (silencioso) {
+        mostrarAviso(context, r.erro!);
+      } else {
+        setState(() {
+          _carregando = false;
+          _erro = r.erro;
+        });
+      }
+      return;
+    }
+
     setState(() {
-      _resumo = resumo;
+      _resumo = ResumoPainel.fromJson(r.dados!);
       _carregando = false;
+      _erro = null;
     });
   }
 

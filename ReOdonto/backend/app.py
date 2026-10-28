@@ -1,5 +1,6 @@
 import os
 import logging
+import secrets
 from datetime import timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -9,6 +10,8 @@ from controllers.paciente_controller import paciente_bp
 from controllers.dentista_controller import dentista_bp
 from controllers.clinica_controller import clinica_bp
 from controllers.agendamento_controller import agendamento_bp
+from controllers.consulta_controller import consulta_bp
+from controllers.painel_controller import painel_bp
 from controllers.cep_controller import cep_bp
 from controllers.google_auth_controller import google_auth_bp
 
@@ -28,12 +31,33 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
+
+def _chave_secreta(nome: str) -> str:
+    """
+    Lê uma chave secreta da variável de ambiente `nome`.
+
+    Nenhuma chave fica escrita no código. Sem a variável definida, gera uma
+    chave aleatória válida só para esta execução: o app sobe normalmente em
+    desenvolvimento, mas os tokens já emitidos deixam de valer a cada
+    reinício. Defina as chaves no .env (veja .env.example).
+    """
+    valor = os.environ.get(nome)
+    if valor:
+        return valor
+    logger.warning(
+        '%s nao definida - gerando chave aleatoria so para esta execucao. '
+        'Os tokens deixam de valer a cada reinicio. Defina %s no .env '
+        '(veja .env.example).', nome, nome,
+    )
+    return secrets.token_hex(32)
+
+
 # --- Segurança ---
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-troque-em-producao')
+app.config['SECRET_KEY'] = _chave_secreta('SECRET_KEY')
 app.config['SESSION_COOKIE_SECURE'] = False   # True em produção (HTTPS)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-troque-em-producao')
+app.config['JWT_SECRET_KEY'] = _chave_secreta('JWT_SECRET_KEY')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=8)  # token expira em 8h
 
 # CORS — em produção substitua '*' pelo domínio real do app
@@ -73,7 +97,11 @@ def token_revogado(jwt_header, jwt_data):
 # --- Banco SQLite ---
 db_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database')
 os.makedirs(db_dir, exist_ok=True)
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(db_dir, "odonto.db")}'
+# DATABASE_URL permite apontar para outro banco (testes, outro ambiente)
+# sem editar o código; sem ela, usa o SQLite local de sempre.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
+    'DATABASE_URL', f'sqlite:///{os.path.join(db_dir, "odonto.db")}'
+)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
@@ -95,15 +123,49 @@ app.register_blueprint(paciente_bp)
 app.register_blueprint(dentista_bp)
 app.register_blueprint(clinica_bp)
 app.register_blueprint(agendamento_bp)
+app.register_blueprint(consulta_bp)
+app.register_blueprint(painel_bp)
 app.register_blueprint(cep_bp)
 app.register_blueprint(google_auth_bp)
 
 # --- Registra modelos adicionais para que db.create_all() crie as tabelas ---
 import models.recuperacao_senha_model  # noqa: F401 — registra tabela recuperacao_senha
 
+def _aplicar_colunas_novas():
+    """
+    Adiciona ao banco já existente as colunas que o código passou a usar.
+
+    db.create_all() só cria tabelas que faltam, não altera as que existem, e
+    o projeto não usa Alembic. Sem isto, um odonto.db criado antes destas
+    colunas quebraria em toda consulta de agendamento.
+    """
+    from sqlalchemy import inspect, text
+
+    colunas_por_tabela = {
+        'agendamento': {
+            'duracao_minutos': 'INTEGER',
+            'valor': 'FLOAT',
+            'encaixe': 'BOOLEAN NOT NULL DEFAULT 0',
+        },
+    }
+
+    inspetor = inspect(db.engine)
+    for tabela, colunas in colunas_por_tabela.items():
+        if not inspetor.has_table(tabela):
+            continue
+        existentes = {coluna['name'] for coluna in inspetor.get_columns(tabela)}
+        for nome, tipo in colunas.items():
+            if nome in existentes:
+                continue
+            db.session.execute(text(f'ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}'))
+            logger.info('Coluna %s.%s adicionada ao banco existente.', tabela, nome)
+    db.session.commit()
+
+
 # --- Criar tabelas ---
 with app.app_context():
     db.create_all()
+    _aplicar_colunas_novas()
     logger.info('Banco de dados inicializado.')
 
 # --- Handlers globais de erro (sempre retornam JSON) ---

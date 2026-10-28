@@ -7,6 +7,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:reodonto/pages/telaPerfil.dart';
 import 'package:reodonto/pages/telaAgenda.dart';
 import 'package:reodonto/pages/telaMenu.dart';
+import 'package:reodonto/pages/telaAlertas.dart';
 import './pages/telaLogin.dart';
 import './services/sessao_usuario.dart';
 
@@ -56,11 +57,12 @@ class MeuApp extends StatelessWidget {
       //home: TelaNovaSenha(email: 'teste@teste.com'),
       //home: const TelaLogin(),
 
-      // para trocar de tela. Adicione aqui conforme telaMenu.dart e telaAlertas.dart forem implementadas.
+      // Rotas usadas pelo menu de navegação (widgets/menu_navegacao.dart).
       routes: {
         '/perfil': (context) => const TelaPerfil(),
         '/agenda': (context) => const TelaAgenda(),
         '/menu': (context) => const TelaMenu(),
+        '/alertas': (context) => const TelaAlertas(),
       },
     );
   }

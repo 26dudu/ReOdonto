@@ -64,7 +64,11 @@ classDiagram
         +String(100) nome_paciente
         +String(20) telefone_paciente
         +DateTime data_hora
+        +int duracao_minutos
+        +float valor
+        +bool encaixe
         +String(20) status
+        +vago() bool
         +to_dict() dict
         +to_dict_completo() dict
     }

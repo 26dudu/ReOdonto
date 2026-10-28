@@ -236,18 +236,22 @@ class ApiService {
   // O app é usado só pelo dentista, então quem chega aqui é sempre um
   // paciente sem conta (nome + telefone), tipo de consulta (texto livre) e data/hora.
   //
-  // TODO(backend): `clinicaId` ficou opcional porque ainda não existe
-  // vínculo dentista→clínica no backend. Assim que existir, o ideal é o
-  // backend inferir a clínica a partir do `dentistaId` (ou do token JWT)
-  // em vez do app precisar informar.
+  // Sem `nomePaciente` o backend cria um HORÁRIO VAGO, que depois recebe um
+  // encaixe pelo botão "Agendar Paciente".
+  // `valor` alimenta o "prejuízo evitado" do painel; `duracaoMinutos` é
+  // usado pelo backend para recusar horários que se sobrepõem.
+  //
+  // O dentista é sempre o do token — o backend ignora `dentistaId`.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> criarAgendamento({
     required int dentistaId,
     required String dataHora, // ISO 8601: "2025-08-15T14:00:00"
-    required String nomePaciente,
-    required String telefonePaciente,
+    String? nomePaciente,
+    String? telefonePaciente,
     int? clinicaId,
     String? consultaCustomizada,
+    double? valor,
+    int? duracaoMinutos,
   }) async {
     try {
       final response = await http
@@ -257,10 +261,14 @@ class ApiService {
             body: jsonEncode({
               'dentista_id': dentistaId,
               'data_hora': dataHora,
-              'nome_paciente': nomePaciente,
-              'telefone_paciente': telefonePaciente,
+              if (nomePaciente != null && nomePaciente.isNotEmpty)
+                'nome_paciente': nomePaciente,
+              if (telefonePaciente != null && telefonePaciente.isNotEmpty)
+                'telefone_paciente': telefonePaciente,
               if (clinicaId != null) 'clinica_id': clinicaId,
               if (consultaCustomizada != null) 'consulta_customizada': consultaCustomizada,
+              if (valor != null) 'valor': valor,
+              if (duracaoMinutos != null) 'duracao_minutos': duracaoMinutos,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -276,22 +284,54 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // CANCELAR AGENDAMENTO — PATCH /agendamentos/<id>/status
+  // STATUS DO AGENDAMENTO — PATCH /agendamentos/<id>/status
   // ----------------------------------------------------------------
-  static Future<ApiResultado<Map<String, dynamic>>> cancelarAgendamento(
-      int id) async {
+  static Future<ApiResultado<Map<String, dynamic>>> _atualizarStatus(
+    int id,
+    String status,
+    String mensagemErro,
+  ) async {
     try {
       final response = await http
           .patch(
             Uri.parse('$_baseUrl/agendamentos/$id/status'),
             headers: _headersAuth,
-            body: jsonEncode({'status': 'cancelado'}),
+            body: jsonEncode({'status': status}),
           )
           .timeout(const Duration(seconds: 10));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) return ApiResultado.sucesso(body);
-      return ApiResultado.falha(body['erro'] ?? 'Erro ao cancelar agendamento');
+      return ApiResultado.falha(body['erro'] ?? mensagemErro);
+    } on SocketException {
+      return const ApiResultado.falha('Sem conexão com o servidor.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  /// Cancela a consulta. O backend abre um horário vago no mesmo lugar e o
+  /// devolve em `horario_liberado` — é o horário que entra na realocação.
+  static Future<ApiResultado<Map<String, dynamic>>> cancelarAgendamento(int id) =>
+      _atualizarStatus(id, 'cancelado', 'Erro ao cancelar agendamento');
+
+  /// Marca o atendimento como realizado (status `concluido`).
+  static Future<ApiResultado<Map<String, dynamic>>> concluirAgendamento(int id) =>
+      _atualizarStatus(id, 'concluido', 'Erro ao confirmar atendimento');
+
+  // ----------------------------------------------------------------
+  // PAINEL — GET /painel/resumo
+  // Devolve o JSON que ResumoPainel.fromJson consome.
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> buscarResumoPainel() async {
+    try {
+      final response = await http
+          .get(Uri.parse('$_baseUrl/painel/resumo'), headers: _headersAuth)
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode == 200) return ApiResultado.sucesso(body);
+      return ApiResultado.falha(body['erro'] ?? 'Erro ao carregar o painel');
     } on SocketException {
       return const ApiResultado.falha('Sem conexão com o servidor.');
     } catch (e) {
@@ -334,9 +374,10 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // ESQUECI MINHA SENHA — POST /pacientes/recuperar-senha
+  // ESQUECI MINHA SENHA — POST /dentistas/recuperar-senha
   // Envia (ou reenvia) o código de verificação para o email informado.
-  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
+  // Antes apontava para /pacientes, que só achava contas de paciente: o
+  // dentista — quem usa o app — não conseguia recuperar a senha.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> solicitarCodigoRecuperacao({
     required String email,
@@ -344,7 +385,7 @@ class ApiService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/pacientes/recuperar-senha'),
+            Uri.parse('$_baseUrl/dentistas/recuperar-senha'),
             headers: _headersPublicos,
             body: jsonEncode({'email': email}),
           )
@@ -364,9 +405,8 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // REDEFINIR SENHA — POST /pacientes/redefinir-senha
+  // REDEFINIR SENHA — POST /dentistas/redefinir-senha
   // Confirma o código recebido por email e define a nova senha.
-  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> redefinirSenha({
     required String email,
@@ -376,7 +416,7 @@ class ApiService {
     try {
       final response = await http
           .post(
-            Uri.parse('$_baseUrl/pacientes/redefinir-senha'),
+            Uri.parse('$_baseUrl/dentistas/redefinir-senha'),
             headers: _headersPublicos,
             body: jsonEncode({
               'email': email,
@@ -484,13 +524,15 @@ class ApiService {
   }
 
   // ----------------------------------------------------------------
-  // DELETAR PERFIL — DELETE /pacientes/<id>
+  // DELETAR PERFIL — DELETE /dentistas/<id>
+  // Antes chamava /pacientes/<id> com o id do dentista: a exclusão falhava
+  // ou, pior, apagava o paciente que tivesse por acaso o mesmo id.
   // ----------------------------------------------------------------
   static Future<ApiResultado<void>> deletarConta(int id) async {
     try {
       final response = await http
           .delete(
-            Uri.parse('$_baseUrl/pacientes/$id'),
+            Uri.parse('$_baseUrl/dentistas/$id'),
             headers: _headersAuth,
           )
           .timeout(const Duration(seconds: 10));
@@ -509,7 +551,8 @@ class ApiService {
   // LOGIN GOOGLE — POST /auth/google/verify-token
   // Envia o idToken (web) ou accessToken (mobile) obtido pelo
   // GoogleSignIn para o backend verificar e retornar um JWT próprio.
-  // Retorna { token, paciente, google_auth: true }
+  // Retorna { token, dentista, google_auth: true } — o mesmo formato do
+  // login por senha, então SessaoUsuario.salvar trata os dois igual.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> loginGoogle({
     String? idToken,

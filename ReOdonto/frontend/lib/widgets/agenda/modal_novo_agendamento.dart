@@ -23,10 +23,11 @@ import '../botao_principal.dart';
 // etapa_consulta.dart, etapa_data_hora.dart). Este arquivo cuida só do
 // estado compartilhado e da lógica de navegação/confirmação.
 //
-// TODO(backend): `dentistaId` é lido de SessaoUsuario.id, assumindo que a
-// sessão salva é a do dentista logado. Quando existir vínculo
-// dentista→clínica no backend, ideal é o backend inferir a clínica a
-// partir do dentista (ou do token JWT) em vez do app precisar informar.
+// O backend sempre usa o dentista do token JWT; `dentistaId` vai no corpo
+// só por compatibilidade e é ignorado lá.
+//
+// Com "Abrir horário vago" ligado na primeira etapa, o horário é criado
+// sem paciente e aparece na agenda pronto para um encaixe.
 // =============================================================================
 
 class ModalNovoAgendamento extends StatefulWidget {
@@ -48,6 +49,11 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
   DateTime? _dataHoraSelecionada;
   TimeOfDay? _horarioSelecionado;
   final _controladorConsultaCustomizada = TextEditingController();
+  final _controladorValor = TextEditingController();
+  final _controladorDuracao = TextEditingController(text: '30');
+
+  // true = cria um horário vago, sem paciente, pronto para um encaixe.
+  bool _horarioVago = false;
 
   // ---- controle de UI ----
   int _etapa = 0;
@@ -64,6 +70,8 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     _controladorNomePaciente.dispose();
     _controladorTelefonePaciente.dispose();
     _controladorConsultaCustomizada.dispose();
+    _controladorValor.dispose();
+    _controladorDuracao.dispose();
     super.dispose();
   }
 
@@ -72,8 +80,18 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
       return;
     }
     if (_etapa == 1) {
-      if (_controladorConsultaCustomizada.text.trim().isEmpty) {
+      if (!_horarioVago && _controladorConsultaCustomizada.text.trim().isEmpty) {
         mostrarAviso(context, 'Informe o tipo de consulta', erro: true);
+        return;
+      }
+      if (_controladorValor.text.trim().isNotEmpty &&
+          lerValorEmReais(_controladorValor.text) == null) {
+        mostrarAviso(context, 'Valor inválido. Use, por exemplo, 200,00', erro: true);
+        return;
+      }
+      final duracao = int.tryParse(_controladorDuracao.text.trim());
+      if (duracao == null || duracao <= 0) {
+        mostrarAviso(context, 'Informe a duração em minutos', erro: true);
         return;
       }
     }
@@ -117,12 +135,17 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
       return;
     }
 
+    final consulta = _controladorConsultaCustomizada.text.trim();
     final r = await ApiService.criarAgendamento(
       dentistaId: dentistaId,
       dataHora: iso,
-      nomePaciente: _controladorNomePaciente.text.trim(),
-      telefonePaciente: _controladorTelefonePaciente.text.trim(),
-      consultaCustomizada: _controladorConsultaCustomizada.text.trim(),
+      // Sem nome o backend cria um horário vago.
+      nomePaciente: _horarioVago ? null : _controladorNomePaciente.text.trim(),
+      telefonePaciente:
+          _horarioVago ? null : _controladorTelefonePaciente.text.trim(),
+      consultaCustomizada: consulta.isEmpty ? null : consulta,
+      valor: lerValorEmReais(_controladorValor.text),
+      duracaoMinutos: int.tryParse(_controladorDuracao.text.trim()),
     );
 
     if (!mounted) return;
@@ -133,7 +156,11 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
       return;
     }
 
-    mostrarAviso(context, 'Agendamento criado com sucesso!', sucesso: true);
+    mostrarAviso(
+      context,
+      _horarioVago ? 'Horário vago aberto na agenda!' : 'Agendamento criado com sucesso!',
+      sucesso: true,
+    );
     Navigator.pop(context);
     widget.onAgendamentoCriado(dataComHora);
   }
@@ -217,12 +244,19 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
           chaveFormulario: _chaveFormularioPaciente,
           controladorNome: _controladorNomePaciente,
           controladorTelefone: _controladorTelefonePaciente,
+          horarioVago: _horarioVago,
+          onHorarioVagoAlterado: (valor) => setState(() => _horarioVago = valor),
         );
       case 1:
-        return EtapaConsulta(controlador: _controladorConsultaCustomizada);
+        return EtapaConsulta(
+          controlador: _controladorConsultaCustomizada,
+          controladorValor: _controladorValor,
+          controladorDuracao: _controladorDuracao,
+          tipoOpcional: _horarioVago,
+        );
       case 2:
         return EtapaDataHora(
-          nomePaciente: _controladorNomePaciente.text,
+          nomePaciente: _horarioVago ? 'Horário vago' : _controladorNomePaciente.text,
           tipoConsulta: _controladorConsultaCustomizada.text.trim(),
           dataSelecionada: _dataHoraSelecionada,
           horarioSelecionado: _horarioSelecionado,

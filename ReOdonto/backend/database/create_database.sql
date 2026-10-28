@@ -1,65 +1,91 @@
 -- create_database.sql
--- Schema atualizado — reflete os models SQLAlchemy reais do projeto.
--- ATENÇÃO: Este arquivo é apenas documentação de referência.
--- O banco é criado automaticamente pelo ORM (db.create_all()) ao iniciar app.py.
+-- Schema de referência, GERADO a partir dos models SQLAlchemy.
+-- O banco é criado automaticamente por db.create_all() ao iniciar app.py;
+-- este arquivo serve só de documentação. Para regenerar depois de mudar
+-- um model, compile CreateTable(tabela) de cada tabela em db.metadata.
+--
+-- Agendamento sem nome_paciente = horário vago. duracao_minutos é a base
+-- da checagem de conflito; valor e encaixe alimentam o painel.
+-- status possíveis: agendado, concluido, cancelado.
 
--- Paciente: dados sensíveis armazenados criptografados (Fernet AES-128).
--- email_hash e cpf_hash são SHA-256 para buscas sem expor o dado real.
-CREATE TABLE IF NOT EXISTS paciente (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome        TEXT    NOT NULL,           -- Fernet encrypted
-    email       TEXT    NOT NULL,           -- Fernet encrypted
-    email_hash  TEXT    NOT NULL UNIQUE,    -- SHA-256 para lookup
-    senha       TEXT    NOT NULL,           -- bcrypt hash
-    telefone    TEXT,                       -- Fernet encrypted
-    cpf         TEXT,                       -- Fernet encrypted
-    cpf_hash    TEXT    UNIQUE,             -- SHA-256 para lookup
-    cep         TEXT,                       -- Fernet encrypted
-    rua         TEXT,                       -- Fernet encrypted
-    bairro      TEXT,                       -- Fernet encrypted
-    numero      TEXT                        -- Fernet encrypted
-);
-
-CREATE INDEX IF NOT EXISTS idx_paciente_email_hash ON paciente (email_hash);
-CREATE INDEX IF NOT EXISTS idx_paciente_cpf_hash   ON paciente (cpf_hash);
-
--- Dentista
-CREATE TABLE IF NOT EXISTS dentista (
-    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome      VARCHAR(100) NOT NULL,
-    email     VARCHAR(150) NOT NULL UNIQUE,
-    telefone  VARCHAR(20),
-    cro       VARCHAR(20)
-);
-
-CREATE INDEX IF NOT EXISTS idx_dentista_email ON dentista (email);
-
--- Clínica
 CREATE TABLE IF NOT EXISTS clinica (
-    id      INTEGER PRIMARY KEY AUTOINCREMENT,
-    nome    VARCHAR(100) NOT NULL,
-    telefone VARCHAR(20),
-    email   VARCHAR(150),
-    cep     VARCHAR(9),
-    rua     VARCHAR(150),
-    bairro  VARCHAR(100),
-    numero  VARCHAR(10),
-    cidade  VARCHAR(100),
-    estado  VARCHAR(2)
+	id INTEGER NOT NULL, 
+	nome VARCHAR(100) NOT NULL, 
+	telefone VARCHAR(20), 
+	email VARCHAR(150), 
+	cep VARCHAR(9), 
+	rua VARCHAR(150), 
+	bairro VARCHAR(100), 
+	numero VARCHAR(10), 
+	cidade VARCHAR(100), 
+	estado VARCHAR(2), 
+	PRIMARY KEY (id)
 );
 
--- Agendamento: relaciona paciente × dentista × clínica
+CREATE TABLE IF NOT EXISTS consulta (
+	id INTEGER NOT NULL, 
+	nome VARCHAR(100) NOT NULL, 
+	descricao TEXT NOT NULL, 
+	valor FLOAT NOT NULL, 
+	duracao_minutos INTEGER, 
+	PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS dentista (
+	id INTEGER NOT NULL, 
+	nome VARCHAR(100) NOT NULL, 
+	email VARCHAR(150) NOT NULL, 
+	senha VARCHAR(255) NOT NULL, 
+	telefone VARCHAR(20), 
+	cro VARCHAR(20), 
+	cpf_cnpj VARCHAR(14), 
+	PRIMARY KEY (id), 
+	UNIQUE (email), 
+	UNIQUE (cpf_cnpj)
+);
+
+CREATE TABLE IF NOT EXISTS paciente (
+	id INTEGER NOT NULL, 
+	nome TEXT NOT NULL, 
+	email TEXT NOT NULL, 
+	email_hash VARCHAR(64) NOT NULL, 
+	senha VARCHAR(255) NOT NULL, 
+	telefone TEXT, 
+	cpf TEXT, 
+	cpf_hash VARCHAR(64), 
+	cep TEXT, 
+	rua TEXT, 
+	bairro TEXT, 
+	numero TEXT, 
+	PRIMARY KEY (id), 
+	UNIQUE (email_hash), 
+	UNIQUE (cpf_hash)
+);
+
+CREATE TABLE IF NOT EXISTS recuperacao_senha (
+	id INTEGER NOT NULL, 
+	email_hash VARCHAR(64) NOT NULL, 
+	codigo_hash VARCHAR(64) NOT NULL, 
+	expira_em DATETIME NOT NULL, 
+	usado BOOLEAN NOT NULL, 
+	criado_em DATETIME NOT NULL, 
+	PRIMARY KEY (id)
+);
+CREATE INDEX IF NOT EXISTS ix_recuperacao_senha_email_hash ON recuperacao_senha (email_hash);
+
 CREATE TABLE IF NOT EXISTS agendamento (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    paciente_id INTEGER NOT NULL REFERENCES paciente(id),
-    dentista_id INTEGER NOT NULL REFERENCES dentista(id),
-    consulta_customizada VARCHAR(200),  -- tipo de consulta em texto livre
-    clinica_id  INTEGER NOT NULL REFERENCES clinica(id),
-    data_hora   DATETIME NOT NULL,
-    status      VARCHAR(20) NOT NULL DEFAULT 'agendado'
-    -- status possíveis: 'agendado', 'concluido', 'cancelado'
+	id INTEGER NOT NULL, 
+	dentista_id INTEGER NOT NULL, 
+	clinica_id INTEGER, 
+	consulta_customizada VARCHAR(200), 
+	nome_paciente VARCHAR(100), 
+	telefone_paciente VARCHAR(20), 
+	data_hora DATETIME NOT NULL, 
+	duracao_minutos INTEGER NOT NULL, 
+	valor FLOAT, 
+	encaixe BOOLEAN NOT NULL, 
+	status VARCHAR(20) NOT NULL, 
+	PRIMARY KEY (id), 
+	FOREIGN KEY(dentista_id) REFERENCES dentista (id), 
+	FOREIGN KEY(clinica_id) REFERENCES clinica (id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_agendamento_paciente  ON agendamento (paciente_id);
-CREATE INDEX IF NOT EXISTS idx_agendamento_dentista  ON agendamento (dentista_id);
-CREATE INDEX IF NOT EXISTS idx_agendamento_data_hora ON agendamento (data_hora);

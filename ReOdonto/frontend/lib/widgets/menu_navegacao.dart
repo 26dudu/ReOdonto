@@ -43,6 +43,7 @@ const List<_ItemMenuInfo> _itensMenu = [
     pagina: PaginaApp.alertas,
     icone: Icons.notifications_none_outlined,
     texto: 'Alertas',
+    rota: '/alertas',
   ),
 ];
 

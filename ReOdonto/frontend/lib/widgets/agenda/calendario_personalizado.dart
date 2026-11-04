@@ -99,7 +99,8 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
     return false;
   }
 
-  DateTime _semHora(DateTime d) => DateTime(d.year, d.month, d.day);
+  // RENOMEADO: 'd' agora é 'data' (data cuja hora será zerada).
+  DateTime _semHora(DateTime data) => DateTime(data.year, data.month, data.day);
 
   bool _pertenceAoMes(DateTime dia) {
     return dia.year == _mesAtual.year && dia.month == _mesAtual.month;

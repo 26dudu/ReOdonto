@@ -10,8 +10,12 @@ import '../services/sessao_usuario.dart';
 import '../theme/app_colors.dart';
 // mostrarAviso.
 import '../utils/avisos.dart';
+// confirmarAcao (pop-up de confirmação reutilizável).
+import '../utils/dialogos.dart';
 // Funções de data (apenasData, mesmoDia, ehHoje, formatarDataCurta).
 import '../utils/formatadores.dart';
+// Título + saudação do topo da agenda.
+import '../widgets/agenda/cabecalho_agenda.dart';
 // Pop-up para agendar um paciente num horário vago.
 import '../widgets/agenda/dialogo_agendar_paciente.dart';
 // Lista visual (timeline) dos agendamentos do dia.
@@ -51,19 +55,22 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
   // Getter calculado toda vez que é lido.
   List<Agendamento> get _agendamentosDoDia => _agendamentos
       // where filtra: só os que têm data válida e cujo dia é o selecionado.
-      .where((a) => a.dataHora != null && mesmoDia(a.dataHora!, _diaSelecionado))
+      // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento da lista (filtro do dia)).
+      .where((agendamento) => agendamento.dataHora != null && mesmoDia(agendamento.dataHora!, _diaSelecionado))
       // Converte o resultado do filtro em lista.
       .toList()
     // ".." (cascade) executa o sort na lista e devolve a própria lista.
     // Ordena pelo horário (compareTo devolve negativo/zero/positivo).
-    ..sort((a, b) => a.dataHora!.compareTo(b.dataHora!));
+    // RENOMEADO: 'a, b' agora é 'primeiro, segundo' (os dois agendamentos que o sort compara).
+    ..sort((primeiro, segundo) => primeiro.dataHora!.compareTo(segundo.dataHora!));
 
   /// Dias com consulta marcada (bolinhas do SeletorDia). Vagos não contam.
   // Set = conjunto sem repetição. A sintaxe { for ... if ... } é uma "collection for/if".
   Set<DateTime> get _diasComConsulta => {
-        for (final a in _agendamentos)
+        // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento do for (dias com consulta)).
+        for (final agendamento in _agendamentos)
           // Só entram dias de agendamentos com data válida e que NÃO são horário vago.
-          if (a.dataHora != null && !a.vago) apenasData(a.dataHora!),
+          if (agendamento.dataHora != null && !agendamento.vago) apenasData(agendamento.dataHora!),
       };
 
   @override
@@ -120,22 +127,24 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
   /// Troca [antigo] por [novo] na lista (se ele ainda estiver lá).
   void _substituir(Agendamento antigo, Agendamento novo) {
     // indexWhere acha a posição do item com o mesmo id (-1 se não achar).
-    final i = _agendamentos.indexWhere((a) => a.id == antigo.id);
+    // RENOMEADO: 'i' agora é 'posicaoNaLista' (posição do agendamento antigo dentro de _agendamentos).
+    final posicaoNaLista = _agendamentos.indexWhere((agendamento) => agendamento.id == antigo.id);
     // Se achou, substitui naquela posição e redesenha.
-    if (i != -1) setState(() => _agendamentos[i] = novo);
+    if (posicaoNaLista != -1) setState(() => _agendamentos[posicaoNaLista] = novo);
   }
 
   // Marca o atendimento como realizado na API (status "concluido").
   // Antes só mudava a tela: ao recarregar, a consulta voltava ao estado
   // anterior e o painel nunca contava a consulta como realizada.
-  Future<void> _confirmarAtendimento(Agendamento a) async {
-    if (a.id == null) return;
+  // RENOMEADO: 'a' agora é 'agendamento' (agendamento que será confirmado).
+  Future<void> _confirmarAtendimento(Agendamento agendamento) async {
+    if (agendamento.id == null) return;
 
-    final resultado = await ApiService.concluirAgendamento(a.id!);
+    final resultado = await ApiService.concluirAgendamento(agendamento.id!);
     if (!mounted) return;
 
     if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
-    _substituir(a, Agendamento.fromJson(resultado.dados!));
+    _substituir(agendamento, Agendamento.fromJson(resultado.dados!));
     mostrarAviso(context, 'Atendimento confirmado.');
   }
 
@@ -143,33 +152,23 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
   // então a agenda é recarregada para ele aparecer pronto para um encaixe.
   // Antes o item só era removido da lista e o horário vago — razão de ser
   // do app — nunca surgia.
-  Future<void> _cancelarConsulta(Agendamento a) async {
+  // RENOMEADO: 'a' agora é 'agendamento' (agendamento que será cancelado).
+  Future<void> _cancelarConsulta(Agendamento agendamento) async {
     // Sem id não há como cancelar.
-    if (a.id == null) return;
+    if (agendamento.id == null) return;
 
-    final confirmou = await showDialog<bool>(
-      context: context,
-      builder: (contexto) => AlertDialog(
-        title: const Text('Cancelar consulta?'),
-        content: Text(
-          'A consulta de ${a.paciente ?? 'paciente'} às ${a.horario} será '
+    // MUDANÇA: o AlertDialog escrito à mão virou a função confirmarAcao (utils/dialogos.dart).
+    final confirmou = await confirmarAcao(
+      context,
+      titulo: 'Cancelar consulta?',
+      mensagem: 'A consulta de ${agendamento.paciente ?? 'paciente'} às ${agendamento.horario} será '
           'cancelada e o horário ficará vago para um encaixe.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(contexto, false),
-            child: const Text('Voltar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(contexto, true),
-            child: const Text('Cancelar consulta'),
-          ),
-        ],
-      ),
+      textoConfirmar: 'Cancelar consulta',
+      textoVoltar: 'Voltar',
     );
     if (confirmou != true || !mounted) return;
 
-    final resultado = await ApiService.cancelarAgendamento(a.id!);
+    final resultado = await ApiService.cancelarAgendamento(agendamento.id!);
     if (!mounted) return;
 
     if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
@@ -270,47 +269,15 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
   Widget _conteudoDaAgenda() {
     // Itens do dia selecionado (já ordenados).
     final itens = _agendamentosDoDia;
+    // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento da lista do dia (contagem dos marcados)).
     // Quantos deles têm paciente (não são vagos).
-    final marcadas = itens.where((a) => !a.vago).length;
-
-    // Função local que escolhe singular/plural: plural(1,'consulta','consultas') → "1 consulta".
-    String plural(int n, String singular, String plural) =>
-        '$n ${n == 1 ? singular : plural}';
+    final marcadas = itens.where((agendamento) => !agendamento.vago).length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Título da página.
-        const Text(
-          'Sua agenda',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textoEscuro,
-          ),
-        ),
-        const SizedBox(height: 6),
-        // Saudação com nome destacado em azul.
-        Text.rich(
-          TextSpan(
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textoEscuro,
-            ),
-            children: [
-              const TextSpan(text: 'Olá, Dra. '),
-              TextSpan(
-                // Se o nome da sessão for null, usa 'Dentista'.
-                text: SessaoUsuario.nome ?? 'Dentista',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.azulPrimario,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // MUDANÇA: título + saudação viraram o widget CabecalhoAgenda.
+        CabecalhoAgenda(nomeDentista: SessaoUsuario.nome),
         const SizedBox(height: 20),
         // Faixa semanal: escolher o dia.
         SeletorDia(
@@ -327,10 +294,11 @@ class _EstadoTelaAgenda extends State<TelaAgenda> {
             : 'Consultas de ${formatarDataCurta(_diaSelecionado)}'),
         const SizedBox(height: 4),
         // Resumo: "2 consultas • 1 horário vago".
+        // MUDANÇA: a função local `plural(n, ...)` virou `pluralizar(quantidade, ...)` em utils/formatadores.dart.
         Text(
           // Duas strings literais vizinhas são concatenadas automaticamente pelo Dart.
-          '${plural(marcadas, 'consulta', 'consultas')} • '
-          '${plural(itens.length - marcadas, 'horário vago', 'horários vagos')}',
+          '${pluralizar(marcadas, 'consulta', 'consultas')} • '
+          '${pluralizar(itens.length - marcadas, 'horário vago', 'horários vagos')}',
           style: const TextStyle(fontSize: 13, color: AppColors.textoCinza),
         ),
         const SizedBox(height: 14),

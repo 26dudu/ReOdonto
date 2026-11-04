@@ -29,7 +29,8 @@ class GraficoDesempenho extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vazio = dados.every((m) => m.valor <= 0);
+    // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
+    final vazio = dados.every((mes) => mes.valor <= 0);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,7 +92,8 @@ class TextoSemDados extends StatelessWidget {
 /// Maior valor "redondo" do eixo (ex.: 2500 -> 3000), para as linhas de grade
 /// caírem em números bonitos.
 double _maximoDoEixo(List<MesDesempenho> dados) {
-  final maior = dados.map((m) => m.valor).fold<double>(0, math.max);
+  // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
+  final maior = dados.map((mes) => mes.valor).fold<double>(0, math.max);
   if (maior <= 0) return 1;
   final magnitude = math.pow(10, (math.log(maior) / math.ln10).floor());
   final passo = magnitude / 2; // 1000 -> 500
@@ -121,13 +123,14 @@ class _BarrasVerticais extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           // Linhas de grade + números do eixo Y.
-          for (int i = 0; i <= _linhas; i++) ...[
+          // RENOMEADO: 'i' agora é 'numeroDaLinha' (número da linha de grade horizontal (0 até _linhas)).
+          for (int numeroDaLinha = 0; numeroDaLinha <= _linhas; numeroDaLinha++) ...[
             Positioned(
               left: 0,
               width: _larguraEixo - 8,
-              bottom: _alturaMes + alturaUtil * i / _linhas - 7,
+              bottom: _alturaMes + alturaUtil * numeroDaLinha / _linhas - 7,
               child: Text(
-                _numero.format(maximo * i / _linhas),
+                _numero.format(maximo * numeroDaLinha / _linhas),
                 textAlign: TextAlign.right,
                 style: const TextStyle(
                   fontSize: 10,
@@ -138,7 +141,7 @@ class _BarrasVerticais extends StatelessWidget {
             Positioned(
               left: _larguraEixo,
               right: 0,
-              bottom: _alturaMes + alturaUtil * i / _linhas,
+              bottom: _alturaMes + alturaUtil * numeroDaLinha / _linhas,
               child: Container(height: 1, color: AppColors.bordaCampo),
             ),
           ],
@@ -250,7 +253,8 @@ class _BarrasHorizontais extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maximo = dados.map((m) => m.valor).fold<double>(0, math.max);
+    // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
+    final maximo = dados.map((mes) => mes.valor).fold<double>(0, math.max);
     final maisRecentesPrimeiro = dados.reversed.toList();
 
     return LayoutBuilder(

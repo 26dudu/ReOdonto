@@ -3,13 +3,19 @@ import '../services/api_service.dart';
 import '../services/sessao_usuario.dart';
 import '../theme/app_colors.dart';
 import '../utils/avisos.dart';
+import '../utils/dialogos.dart';
 import '../widgets/menu_navegacao.dart';
 import '../widgets/pagina_com_menu.dart';
+import '../widgets/perfil/botoes_edicao_perfil.dart';
 import '../widgets/perfil/campos_perfil.dart';
 import '../widgets/perfil/grade_campos.dart';
 import '../widgets/perfil/pilula_info.dart';
 import '../widgets/secoes_texto.dart';
 import 'telaLogin.dart';
+
+// MUDANÇAS NESTE ARQUIVO (de 306 para 274 linhas): o pop-up de logout usa
+// confirmarAcao (utils/dialogos.dart) e os botões Salvar/Cancelar viraram o
+// widget BotoesEdicaoPerfil.
 
 class TelaPerfil extends StatefulWidget {
   const TelaPerfil({super.key});
@@ -40,8 +46,9 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
 
   @override
   void dispose() {
-    for (final c in [_nome, _email, _telefone, _cro]) {
-      c.dispose();
+    // RENOMEADO: 'c' agora é 'controlador' (cada TextEditingController liberado no dispose).
+    for (final controlador in [_nome, _email, _telefone, _cro]) {
+      controlador.dispose();
     }
     super.dispose();
   }
@@ -123,22 +130,14 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       _editando ? _cancelarEdicao() : setState(() => _editando = true);
 
   Future<void> _logout() async {
-    final sair = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Confirmar Logout'),
-        content: const Text('Tem certeza que deseja sair de sua conta?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Sair', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
+    // MUDANÇA: o AlertDialog escrito à mão virou a função confirmarAcao (utils/dialogos.dart).
+    final sair = await confirmarAcao(
+      context,
+      titulo: 'Confirmar Logout',
+      mensagem: 'Tem certeza que deseja sair de sua conta?',
+      textoConfirmar: 'Sair',
+      textoVoltar: 'Cancelar',
+      corConfirmar: Colors.redAccent,
     );
     if (sair != true) return;
 
@@ -193,12 +192,16 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
   }
 
   Widget _corpo(bool celular) {
-    Widget campo(String rotulo, TextEditingController c, {bool editavel = true}) =>
-        CampoPerfil(
-          rotulo: rotulo,
-          controlador: c,
-          somenteLeitura: !_editando || !editavel,
-        );
+    // RENOMEADO: 'c' agora é 'controlador' (TextEditingController do campo).
+    Widget campo(
+      String rotulo,
+      TextEditingController controlador, {
+      bool editavel = true,
+    }) => CampoPerfil(
+      rotulo: rotulo,
+      controlador: controlador,
+      somenteLeitura: !_editando || !editavel,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,17 +212,21 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
           children: [
             TituloSecao(celular ? 'Seu perfil:' : 'Sua avaliação:'),
             if (celular)
-              Row(children: [
-                IconButton(
-                  icon: Icon(_editando ? Icons.close : Icons.edit,
-                      color: AppColors.azulPrimario),
-                  onPressed: _alternarEdicao,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.logout, color: Colors.redAccent),
-                  onPressed: _logout,
-                ),
-              ]),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      _editando ? Icons.close : Icons.edit,
+                      color: AppColors.azulPrimario,
+                    ),
+                    onPressed: _alternarEdicao,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.logout, color: Colors.redAccent),
+                    onPressed: _logout,
+                  ),
+                ],
+              ),
           ],
         ),
         const SizedBox(height: 10),
@@ -236,7 +243,10 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: PilulaInfo(rotulo: 'Consultas:', valor: '$_totalConsultas'),
+                child: PilulaInfo(
+                  rotulo: 'Consultas:',
+                  valor: '$_totalConsultas',
+                ),
               ),
             ],
           ),
@@ -260,47 +270,15 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
         ),
         if (_editando) ...[
           const SizedBox(height: 24),
-          _botoesEdicao(celular),
+          // MUDANÇA: o método _botoesEdicao virou o widget BotoesEdicaoPerfil.
+          BotoesEdicaoPerfil(
+            celular: celular,
+            salvando: _salvando,
+            onSalvar: _salvarPerfil,
+            onCancelar: _cancelarEdicao,
+          ),
         ],
       ],
     );
-  }
-
-  /// Salvar + Cancelar: empilhados no celular, lado a lado no desktop.
-  Widget _botoesEdicao(bool celular) {
-    final forma = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
-
-    final salvar = ElevatedButton(
-      onPressed: _salvando ? null : _salvarPerfil,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.azulPrimario,
-        minimumSize: const Size(0, 50),
-        shape: forma,
-      ),
-      child: _salvando
-          ? const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-            )
-          : const Text('Salvar Alterações',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-    );
-
-    final cancelar = OutlinedButton(
-      onPressed: _cancelarEdicao,
-      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 50), shape: forma),
-      child: const Text('Cancelar'),
-    );
-
-    return celular
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [salvar, const SizedBox(height: 12), cancelar],
-          )
-        : Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [cancelar, const SizedBox(width: 16), salvar],
-          );
   }
 }

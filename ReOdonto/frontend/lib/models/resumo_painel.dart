@@ -90,19 +90,22 @@ class ResumoPainel {
           (resumo['horarios_recuperados'] as num?)?.toInt() ?? 0,
       taxaOcupacao: (resumo['taxa_ocupacao'] as num?)?.toDouble() ?? 0,
       desempenho: lista
-          .map((e) => MesDesempenho.fromJson(e as Map<String, dynamic>))
+          // RENOMEADO: 'e' agora é 'itemJson' (cada item da lista "desempenho" vindo do JSON).
+          .map((itemJson) => MesDesempenho.fromJson(itemJson as Map<String, dynamic>))
           .toList(),
     );
   }
 
   /// true quando não há nada para mostrar no gráfico.
-  bool get graficoVazio => desempenho.every((m) => m.valor <= 0);
+  // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de desempenho).
+  bool get graficoVazio => desempenho.every((mes) => mes.valor <= 0);
 
   static List<MesDesempenho> _ultimosMeses(int quantidade) {
     final agora = DateTime.now();
     final formato = DateFormat('MMM', 'pt_BR');
-    return List.generate(quantidade, (i) {
-      final mes = DateTime(agora.year, agora.month - (quantidade - 1 - i));
+    // RENOMEADO: 'i' agora é 'posicao' (posição (0, 1, 2...) do mês que está sendo gerado).
+    return List.generate(quantidade, (posicao) {
+      final mes = DateTime(agora.year, agora.month - (quantidade - 1 - posicao));
       final nome = formato.format(mes).replaceAll('.', '');
       return MesDesempenho(
         rotulo: nome[0].toUpperCase() + nome.substring(1),

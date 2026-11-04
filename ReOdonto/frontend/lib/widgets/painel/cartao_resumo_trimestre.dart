@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../models/resumo_painel.dart';
 import '../../theme/app_colors.dart';
 import 'cartao_indicador.dart';
 
@@ -19,6 +20,36 @@ class LinhaResumoTrimestre {
 class CartaoResumoTrimestre extends StatelessWidget {
   final List<LinhaResumoTrimestre> linhas;
   const CartaoResumoTrimestre({super.key, required this.linhas});
+
+  // NOVO CONSTRUTOR: antes a telaMenu.dart montava as 4 linhas "na mão".
+  // Agora ela só chama `CartaoResumoTrimestre.deResumo(dadosDoPainel)`.
+  /// Monta o cartão já com as 4 linhas a partir do resumo vindo da API.
+  factory CartaoResumoTrimestre.deResumo(ResumoPainel resumo) {
+    return CartaoResumoTrimestre(
+      linhas: [
+        LinhaResumoTrimestre(
+          icone: Icons.event_available_outlined,
+          rotulo: 'Consultas realizadas',
+          valor: '${resumo.consultasRealizadas}',
+        ),
+        LinhaResumoTrimestre(
+          icone: Icons.cancel_outlined,
+          rotulo: 'Cancelamentos',
+          valor: '${resumo.cancelamentos}',
+        ),
+        LinhaResumoTrimestre(
+          icone: Icons.event_repeat_outlined,
+          rotulo: 'Horários recuperados',
+          valor: '${resumo.horariosRecuperados3Meses}',
+        ),
+        LinhaResumoTrimestre(
+          icone: Icons.bar_chart,
+          rotulo: 'Taxa de ocupação',
+          valor: '${resumo.taxaOcupacao.round()}%',
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,9 +74,10 @@ class CartaoResumoTrimestre extends StatelessWidget {
           ),
           child: Column(
             children: [
-              for (int i = 0; i < linhas.length; i++) ...[
-                if (i > 0) const SizedBox(height: 10),
-                _Linha(linha: linhas[i]),
+              // RENOMEADO: 'i' agora é 'posicao' (posição da linha no for).
+              for (int posicao = 0; posicao < linhas.length; posicao++) ...[
+                if (posicao > 0) const SizedBox(height: 10),
+                _Linha(linha: linhas[posicao]),
               ],
             ],
           ),

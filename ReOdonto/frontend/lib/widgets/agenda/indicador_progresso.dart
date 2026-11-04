@@ -15,9 +15,10 @@ class IndicadorProgresso extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: List.generate(totalEtapas, (i) {
-        final ativo = i == etapaAtual;
-        final concluido = i < etapaAtual;
+      // RENOMEADO: 'i' agora é 'posicao' (posição da barrinha (0, 1, 2...)).
+      children: List.generate(totalEtapas, (posicao) {
+        final ativo = posicao == etapaAtual;
+        final concluido = posicao < etapaAtual;
         return Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 2),

@@ -21,7 +21,8 @@ class GradeCampos extends StatelessWidget {
           spacing: _espacoH,
           runSpacing: _espacoV,
           children: [
-            for (final f in filhos) SizedBox(width: largura, child: f),
+            // RENOMEADO: 'f' agora é 'filho' (cada widget da lista "filhos").
+            for (final filho in filhos) SizedBox(width: largura, child: filho),
           ],
         );
       },

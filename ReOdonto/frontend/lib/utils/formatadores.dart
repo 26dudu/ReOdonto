@@ -60,7 +60,14 @@ String formatarDuracao(int? minutos) {
 /// Zera a hora: 2026-09-28 14:30 -> 2026-09-28 00:00.
 DateTime apenasData(DateTime data) => DateTime(data.year, data.month, data.day);
 
-bool mesmoDia(DateTime a, DateTime b) =>
-    a.year == b.year && a.month == b.month && a.day == b.day;
+// RENOMEADO: 'a' e 'b' agora são 'primeiraData' e 'segundaData' (as duas datas comparadas).
+bool mesmoDia(DateTime primeiraData, DateTime segundaData) =>
+    primeiraData.year == segundaData.year && primeiraData.month == segundaData.month && primeiraData.day == segundaData.day;
 
 bool ehHoje(DateTime data) => mesmoDia(data, DateTime.now());
+
+// NOVA FUNÇÃO: antes era uma função local dentro do _conteudoDaAgenda da
+// telaAgenda.dart (com o parâmetro "n"). Agora qualquer tela pode usar.
+/// Escolhe singular ou plural: pluralizar(1, 'consulta', 'consultas') → "1 consulta".
+String pluralizar(int quantidade, String singular, String plural) =>
+    '$quantidade ${quantidade == 1 ? singular : plural}';

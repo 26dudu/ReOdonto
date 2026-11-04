@@ -106,11 +106,12 @@ class _InputHorarioState extends State<InputHorario> {
                 ),
                 hint: const Text('--'),
                 // Gera as opções de 0 a 23, formatadas com 2 dígitos (ex: "08").
-                items: List.generate(24, (h) => h)
+                // RENOMEADO: 'h' agora é 'hora' (hora (0 a 23) de cada opção do dropdown).
+                items: List.generate(24, (hora) => hora)
                     .map(
-                      (h) => DropdownMenuItem(
-                        value: h,
-                        child: Text(h.toString().padLeft(2, '0')),
+                      (hora) => DropdownMenuItem(
+                        value: hora,
+                        child: Text(hora.toString().padLeft(2, '0')),
                       ),
                     )
                     .toList(),
@@ -137,9 +138,10 @@ class _InputHorarioState extends State<InputHorario> {
                 // Usa a lista fixa de minutos permitidos (0, 15, 30, 45).
                 items: _minutosPermitidos
                     .map(
-                      (m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(m.toString().padLeft(2, '0')),
+                      // RENOMEADO: 'm' agora é 'minuto' (minuto permitido (0, 15, 30, 45) de cada opção do dropdown).
+                      (minuto) => DropdownMenuItem(
+                        value: minuto,
+                        child: Text(minuto.toString().padLeft(2, '0')),
                       ),
                     )
                     .toList(),

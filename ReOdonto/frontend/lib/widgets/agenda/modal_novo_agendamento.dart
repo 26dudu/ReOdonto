@@ -136,7 +136,8 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     }
 
     final consulta = _controladorConsultaCustomizada.text.trim();
-    final r = await ApiService.criarAgendamento(
+    // RENOMEADO: 'r' agora é 'resultado' (resposta (ApiResultado) da API ao criar o agendamento).
+    final resultado = await ApiService.criarAgendamento(
       dentistaId: dentistaId,
       dataHora: iso,
       // Sem nome o backend cria um horário vago.
@@ -151,8 +152,8 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     if (!mounted) return;
     setState(() => _salvando = false);
 
-    if (r.temErro) {
-      mostrarAviso(context, r.erro!, erro: true);
+    if (resultado.temErro) {
+      mostrarAviso(context, resultado.erro!, erro: true);
       return;
     }
 

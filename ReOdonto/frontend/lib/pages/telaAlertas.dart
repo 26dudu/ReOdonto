@@ -61,9 +61,11 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
         .map((item) => Agendamento.fromJson(item as Map<String, dynamic>))
         // Só horários vagos que ainda não passaram — os outros não têm mais
         // como ser recuperados.
-        .where((a) => a.vago && a.dataHora != null && a.dataHora!.isAfter(agora))
+        // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento candidato a "horário vago futuro").
+        .where((agendamento) => agendamento.vago && agendamento.dataHora != null && agendamento.dataHora!.isAfter(agora))
         .toList()
-      ..sort((a, b) => a.dataHora!.compareTo(b.dataHora!));
+      // RENOMEADO: 'a, b' agora é 'primeiro, segundo' (os dois agendamentos que o sort compara).
+      ..sort((primeiro, segundo) => primeiro.dataHora!.compareTo(segundo.dataHora!));
 
     setState(() {
       _vagos = vagos;
@@ -91,7 +93,8 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
     if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
 
     // O horário deixou de ser vago: sai da lista.
-    setState(() => _vagos.removeWhere((a) => a.id == vago.id));
+    // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento da lista de vagos).
+    setState(() => _vagos.removeWhere((agendamento) => agendamento.id == vago.id));
     mostrarAviso(context, 'Paciente encaixado com sucesso!');
   }
 
@@ -117,7 +120,8 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
 
   Widget _conteudo() {
     final total = _vagos.length;
-    final valorEmAberto = _vagos.fold<double>(0, (soma, a) => soma + (a.preco ?? 0));
+    // RENOMEADO: 'a' agora é 'agendamento' (cada horário vago somado no fold).
+    final valorEmAberto = _vagos.fold<double>(0, (soma, agendamento) => soma + (agendamento.preco ?? 0));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

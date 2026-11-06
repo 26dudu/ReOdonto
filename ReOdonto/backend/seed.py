@@ -1,5 +1,5 @@
 """
-seed.py — Popula o banco com dados iniciais (clínica).
+seed.py — Popula o banco com dados iniciais (clínica e dentista de teste).
 
 Execute UMA vez depois de inicializar o banco:
     python seed.py
@@ -22,6 +22,17 @@ except ImportError:
 
 from app import app, db
 from models.clinica_model import Clinica
+from repositories import dentista_repository
+from services import dentista_service
+
+DENTISTA_TESTE = {
+    'nome': 'Dentista Teste',
+    'email': 'teste@reodonto.com',
+    'senha': 'Teste12345',
+    'telefone': '31999990000',
+    'cro': 'MG-12345',
+    'cpf_cnpj': '52998224725',
+}
 
 
 with app.app_context():
@@ -49,10 +60,18 @@ with app.app_context():
 
     db.session.commit()
 
+    dentista = dentista_repository.buscar_por_email(DENTISTA_TESTE['email'])
+    if not dentista:
+        dentista = dentista_service.criar_dentista(DENTISTA_TESTE)
+        print(f' Dentista de teste criado: {dentista.email} (id={dentista.id})')
+    else:
+        print(f'  Dentista de teste já existe: {dentista.email} (id={dentista.id})')
+
     print('\n' + '='*50)
     print(' Seed concluído com sucesso!')
     print('='*50)
     print(f'\n Clínica → id={clinica.id} ({clinica.nome})')
+    print(f" Dentista de teste → {DENTISTA_TESTE['email']} / {DENTISTA_TESTE['senha']}")
     print('\n  Próximos passos:')
     print('  1. Inicie o backend: python app.py')
-    print('  2. No app Flutter, faça cadastro para criar sua conta de dentista')
+    print('  2. No app Flutter, entre com o dentista de teste ou cadastre sua própria conta')

@@ -70,6 +70,8 @@ cp ../.env.example .env      # preencha SECRET_KEY, JWT_SECRET_KEY e ENCRYPTION_
 python app.py
 ```
 
+Para já começar com uma conta de dentista de teste (`teste@reodonto.com`, senha `Teste12345`) e a clínica inicial, rode `python seed.py` uma vez antes de subir o back-end. É uma conta só de demonstração.
+
 Sem as chaves no `.env` o back-end sobe mesmo assim, mas gera chaves aleatórias a cada execução (os logins caem quando ele reinicia). Nenhuma chave ou credencial fica no código: `.env`, `client_secret.json` e o banco `odonto.db` estão no `.gitignore`. Bancos criados antes desta versão recebem as colunas novas automaticamente ao subir.
 
 Para conferir os fluxos principais (agenda, cancelamento, encaixe, painel, autorização, recuperação de senha e login Google) contra um banco temporário:

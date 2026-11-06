@@ -16,7 +16,7 @@ Como cada indicador é calculado:
 """
 from datetime import datetime
 
-from models.agendamento_model import Agendamento
+from repositories import agendamento_repository
 
 MESES_ABREVIADOS = [
     'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
@@ -76,14 +76,7 @@ def montar_resumo(dentista_id: int, agora: datetime | None = None) -> dict:
     inicio_grafico = _inicio_do_mes(agora, MESES_GRAFICO - 1)
 
     # Uma única leitura cobre o gráfico (6 meses) e o resumo (3 meses).
-    todos = (
-        Agendamento.query
-        .filter(
-            Agendamento.dentista_id == dentista_id,
-            Agendamento.data_hora >= inicio_grafico,
-        )
-        .all()
-    )
+    todos = agendamento_repository.listar_desde(dentista_id, inicio_grafico)
     do_resumo = [a for a in todos if a.data_hora >= inicio_resumo]
 
     encaixes = [a for a in do_resumo if _e_encaixe(a)]

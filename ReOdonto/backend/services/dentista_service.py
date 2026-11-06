@@ -1,8 +1,7 @@
 import re
 import bcrypt
-from sqlalchemy import func
-from database.db import db
 from models.dentista_model import Dentista
+from repositories import agendamento_repository, dentista_repository as repo
 
 # Mesmo mínimo que o app já exige em validadores.dart — antes o backend
 # aceitava 6, deixando a regra mais fraca que a da tela de cadastro.
@@ -63,7 +62,7 @@ def criar_dentista(data):
     # Comparação sem diferenciar maiúsculas: email não é case-sensitive, e
     # antes "Joao@x.com" e "joao@x.com" podiam coexistir como contas distintas.
     email = data['email'].strip()
-    if Dentista.query.filter(func.lower(Dentista.email) == email.lower()).first():
+    if repo.buscar_por_email(email):
         raise ValueError('Email já cadastrado')
 
     # Processa CPF ou CNPJ
@@ -80,7 +79,7 @@ def criar_dentista(data):
         else:
             raise ValueError('CPF deve ter 11 dígitos ou CNPJ deve ter 14 dígitos')
 
-        if Dentista.query.filter_by(cpf_cnpj=cpf_cnpj).first():
+        if repo.buscar_por_cpf_cnpj(cpf_cnpj):
             raise ValueError('CPF/CNPJ já cadastrado')
 
     dentista = Dentista(
@@ -91,15 +90,13 @@ def criar_dentista(data):
         cro=data.get('cro'),
         cpf_cnpj=cpf_cnpj,
     )
-    db.session.add(dentista)
-    db.session.commit()
+    repo.adicionar(dentista)
+    repo.confirmar()
     return dentista
 
 
 def login_dentista(email: str, senha: str) -> Dentista:
-    dentista = Dentista.query.filter(
-        func.lower(Dentista.email) == (email or '').strip().lower()
-    ).first()
+    dentista = repo.buscar_por_email(email)
     if not dentista or not _verificar_senha(senha, dentista.senha):
         raise ValueError('Email ou senha inválidos')
     return dentista
@@ -107,34 +104,20 @@ def login_dentista(email: str, senha: str) -> Dentista:
 
 def listar_dentistas(clinica_id: int | None = None):
     if clinica_id:
-        from models.agendamento_model import Agendamento
-        ids = (
-            db.session.query(Agendamento.dentista_id)
-            .filter(Agendamento.clinica_id == clinica_id)
-            .distinct()
-            .all()
-        )
-        id_list = [row[0] for row in ids]
-        if not id_list:
-            return []
-        return Dentista.query.filter(Dentista.id.in_(id_list)).all()
-    return Dentista.query.all()
+        return repo.listar_por_clinica(clinica_id)
+    return repo.listar_todos()
 
 
 def buscar_dentista(id):
-    return db.get_or_404(Dentista, id)
+    return repo.buscar_ou_404(id)
 
 
 def atualizar_dentista(id, data):
-    dentista = db.get_or_404(Dentista, id)
+    dentista = repo.buscar_ou_404(id)
 
     novo_email = (data.get('email') or '').strip()
     if novo_email and novo_email.lower() != dentista.email.lower():
-        em_uso = Dentista.query.filter(
-            func.lower(Dentista.email) == novo_email.lower(),
-            Dentista.id != dentista.id,
-        ).first()
-        if em_uso:
+        if repo.email_em_uso_por_outro(novo_email, dentista.id):
             raise ValueError('Email já está em uso')
         dentista.email = novo_email
 
@@ -155,7 +138,7 @@ def atualizar_dentista(id, data):
                     raise ValueError('CNPJ inválido')
             else:
                 raise ValueError('CPF deve ter 11 ou CNPJ deve ter 14 dígitos')
-            if Dentista.query.filter_by(cpf_cnpj=novo).first():
+            if repo.buscar_por_cpf_cnpj(novo):
                 raise ValueError('CPF/CNPJ já está em uso')
             dentista.cpf_cnpj = novo
     # Troca de senha pelo perfil exige a senha atual: só o token não basta,
@@ -172,7 +155,7 @@ def atualizar_dentista(id, data):
             )
         dentista.senha = _hash_senha(data['senha'])
 
-    db.session.commit()
+    repo.confirmar()
     return dentista
 
 
@@ -184,9 +167,7 @@ def deletar_dentista(id):
     tem agendamentos, então a exclusão falhava com erro 500 em vez de
     funcionar. Os agendamentos saem primeiro, na mesma transação.
     """
-    from models.agendamento_model import Agendamento
-
-    dentista = db.get_or_404(Dentista, id)
-    Agendamento.query.filter_by(dentista_id=id).delete(synchronize_session=False)
-    db.session.delete(dentista)
-    db.session.commit()
+    dentista = repo.buscar_ou_404(id)
+    agendamento_repository.remover_do_dentista(id)
+    repo.remover(dentista)
+    repo.confirmar()

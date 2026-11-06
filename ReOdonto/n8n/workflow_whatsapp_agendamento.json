@@ -1,0 +1,180 @@
+{
+  "name": "ReOdonto - Agendamento por WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "reodonto-whatsapp"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $env.ANTHROPIC_API_KEY }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 1000, thinking: { type: 'disabled' }, system: \"Voce e a recepcionista virtual de uma clinica odontologica. Voce recebe a conversa recente com o paciente, com a mensagem mais recente por ultimo, e deve responder SOMENTE com um JSON valido, sem texto extra, com as chaves: data_hora (formato ISO 8601 'YYYY-MM-DDTHH:MM:00'), consulta (tipo de atendimento que o paciente pediu, como limpeza, clareamento ou avaliacao), nome (nome que o paciente informou). Use a conversa inteira; quando o paciente corrigir algo, a mensagem mais recente prevalece. Cada campo so deve ser preenchido se o paciente tiver dito explicitamente na conversa; se faltar qualquer informacao, use null nesse campo e NUNCA invente, assuma ou complete valores. data_hora so pode ser preenchido quando o paciente informou a data E o horario, ainda que em mensagens diferentes. Resolva datas relativas como 'amanha' e 'quinta' a partir da data e hora atual informada. Nao use o nome do perfil do WhatsApp, apenas o nome que o paciente escrever.\" + ' Agora: ' + $now.setZone('America/Sao_Paulo').toFormat(\"yyyy-MM-dd HH:mm (cccc)\"), messages: [{ role: 'user', content: $json.body.mensagem }] }) }}",
+        "options": {}
+      },
+      "name": "IA extrai data e tipo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $('Webhook WhatsApp').first().json.body;\nconst bloco = ($input.first().json.content || []).find((b) => b.type === 'text');\nconst texto = bloco ? bloco.text : '';\nlet dados = {};\ntry {\n  dados = JSON.parse(texto.match(/\\{[\\s\\S]*\\}/)[0]);\n} catch (e) {\n  dados = {};\n}\nreturn [{\n  json: {\n    dentista_id: Number(entrada.dentista_id || $env.DENTISTA_ID_PADRAO),\n    nome_paciente: dados.nome || '',\n    telefone_paciente: entrada.telefone || '',\n    data_hora: dados.data_hora || '',\n    consulta_customizada: dados.consulta || '',\n    telefone_resposta: entrada.telefone || ''\n  }\n}];"
+      },
+      "name": "Interpretar mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.REODONTO_API_URL }}/integracoes/whatsapp/agendar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.INTEGRACAO_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dentista_id: $json.dentista_id, nome_paciente: $json.nome_paciente, telefone_paciente: $json.telefone_paciente, data_hora: $json.data_hora, consulta_customizada: $json.consulta_customizada }) }}",
+        "options": {}
+      },
+      "name": "Agendar no ReOdonto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nreturn [{ json: { telefone: $('Interpretar mensagem').first().json.telefone_resposta, status: r.status, resposta: r.mensagem } }];"
+      },
+      "name": "Montar resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "name": "Responder ao WhatsApp",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "IA extrai data e tipo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IA extrai data e tipo": {
+      "main": [
+        [
+          {
+            "node": "Interpretar mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Interpretar mensagem": {
+      "main": [
+        [
+          {
+            "node": "Agendar no ReOdonto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agendar no ReOdonto": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder ao WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "51OAvzd01gznwuxq"
+}

@@ -1,5 +1,5 @@
-from database.db import db
 from models.paciente_model import Paciente
+from repositories import paciente_repository as repo
 import bcrypt
 from utils.crypto import encrypt_data, decrypt_data, hash_data
 from services.brasilapi_cep import buscar_cep as api_buscar_cep
@@ -37,14 +37,14 @@ def criar_paciente(data):
 
     # Verifica email duplicado usando hash
     email_hash = hash_data(data['email'])
-    if Paciente.query.filter_by(email_hash=email_hash).first():
+    if repo.buscar_por_email_hash(email_hash):
         raise ValueError('Email já cadastrado')
 
     # Verifica CPF duplicado se fornecido
     cpf_hash = None
     if data.get('cpf'):
         cpf_hash = hash_data(data['cpf'])
-        if Paciente.query.filter_by(cpf_hash=cpf_hash).first():
+        if repo.buscar_por_cpf_hash(cpf_hash):
             raise ValueError('CPF já cadastrado')
 
     # Hash da senha — nunca salvar em texto puro
@@ -63,21 +63,21 @@ def criar_paciente(data):
         bairro=encrypt_data(data.get('bairro')),
         numero=encrypt_data(data.get('numero')),
     )
-    db.session.add(paciente)
-    db.session.commit()
+    repo.adicionar(paciente)
+    repo.confirmar()
     return paciente
 
 
 def listar_pacientes():
-    return Paciente.query.all()
+    return repo.listar_todos()
 
 
 def buscar_paciente(id):
-    return db.get_or_404(Paciente, id)
+    return repo.buscar_ou_404(id)
 
 
 def atualizar_paciente(id, data):
-    paciente = db.get_or_404(Paciente, id)
+    paciente = repo.buscar_ou_404(id)
 
     # Se alterar CEP, rua ou bairro, validar correspondência
     novo_cep = data.get('cep', decrypt_data(paciente.cep))
@@ -90,7 +90,7 @@ def atualizar_paciente(id, data):
     novo_email = data.get('email')
     if novo_email and hash_data(novo_email) != paciente.email_hash:
         novo_email_hash = hash_data(novo_email)
-        if Paciente.query.filter_by(email_hash=novo_email_hash).first():
+        if repo.buscar_por_email_hash(novo_email_hash):
             raise ValueError('Email já está em uso')
         paciente.email = encrypt_data(novo_email)
         paciente.email_hash = novo_email_hash
@@ -99,7 +99,7 @@ def atualizar_paciente(id, data):
     novo_cpf = data.get('cpf')
     if novo_cpf and hash_data(novo_cpf) != paciente.cpf_hash:
         novo_cpf_hash = hash_data(novo_cpf)
-        if Paciente.query.filter_by(cpf_hash=novo_cpf_hash).first():
+        if repo.buscar_por_cpf_hash(novo_cpf_hash):
             raise ValueError('CPF já está em uso')
         paciente.cpf = encrypt_data(novo_cpf)
         paciente.cpf_hash = novo_cpf_hash
@@ -123,20 +123,20 @@ def atualizar_paciente(id, data):
         senha_hash = bcrypt.hashpw(data['senha'].encode('utf-8'), bcrypt.gensalt())
         paciente.senha = senha_hash.decode('utf-8')
 
-    db.session.commit()
+    repo.confirmar()
     return paciente
 
 
 def deletar_paciente(id):
-    paciente = db.get_or_404(Paciente, id)
-    db.session.delete(paciente)
-    db.session.commit()
+    paciente = repo.buscar_ou_404(id)
+    repo.remover(paciente)
+    repo.confirmar()
 
 
 def buscar_paciente_por_email(email):
     """Busca paciente pelo email — usado no login."""
     email_hash = hash_data(email)
-    paciente = Paciente.query.filter_by(email_hash=email_hash).first()
+    paciente = repo.buscar_por_email_hash(email_hash)
     if not paciente:
         raise ValueError('Email ou senha inválidos')
     return paciente

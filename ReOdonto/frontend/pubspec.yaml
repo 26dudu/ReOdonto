@@ -105,3 +105,6 @@ flutter:
   # see https://flutter.dev/to/font-from-package
 
   
+dependency_overrides:
+  font_awesome_flutter: ^11.0.0
+  sign_in_button: ^5.0.0

@@ -292,6 +292,104 @@ r = cliente.post('/auth/google/verify-token', json={'access_token': 'token-valid
 checar('segundo login Google reusa a mesma conta',
        (r.get_json() or {}).get('dentista', {}).get('id') == corpo.get('dentista', {}).get('id'))
 
+print('\n--- Agendamento por WhatsApp (n8n) ---')
+os.environ['INTEGRACAO_API_KEY'] = 'chave-de-teste-integracao'
+chave = {'X-API-Key': 'chave-de-teste-integracao'}
+r = cliente.post('/dentistas/', json={
+    'nome': 'Dr. Zé', 'email': 'ze@clinica.com', 'senha': 'SenhaForte1',
+    'telefone': '31977776666', 'cro': 'MG-777', 'cpf_cnpj': '11144477735',
+})
+ze_id = r.get_json()['id']
+r = cliente.post('/dentistas/login', json={'email': 'ze@clinica.com', 'senha': 'SenhaForte1'})
+ze_token = r.get_json()['token']
+
+amanha = (datetime.now() + timedelta(days=2)).replace(hour=10, minute=0, second=0, microsecond=0)
+while amanha.weekday() >= 5:
+    amanha += timedelta(days=1)
+vago_dia = (datetime.now() + timedelta(days=3)).replace(hour=9, minute=0, second=0, microsecond=0)
+vago_outro = (datetime.now() + timedelta(days=4)).replace(hour=15, minute=0, second=0, microsecond=0)
+
+
+def pedido(**extra):
+    corpo = {'dentista_id': ze_id, 'nome_paciente': 'Carla', 'telefone_paciente': '31966665555',
+             'data_hora': amanha.isoformat(), 'consulta_customizada': 'Limpeza'}
+    corpo.update(extra)
+    return cliente.post('/integracoes/whatsapp/agendar', json=corpo, headers=chave)
+
+
+r = cliente.post('/integracoes/whatsapp/agendar', json={})
+checar('sem chave de API retorna 401', r.status_code == 401, r.get_data(as_text=True))
+r = cliente.post('/integracoes/whatsapp/agendar', json={}, headers={'X-API-Key': 'errada'})
+checar('chave errada retorna 401', r.status_code == 401)
+
+chave_original = os.environ.pop('INTEGRACAO_API_KEY')
+r = cliente.post('/integracoes/whatsapp/agendar', json={}, headers=chave)
+checar('integração sem chave configurada retorna 503', r.status_code == 503)
+os.environ['INTEGRACAO_API_KEY'] = chave_original
+
+r = pedido(nome_paciente='')
+checar('pedido sem nome devolve dados_incompletos',
+       r.status_code == 200 and r.get_json()['status'] == 'dados_incompletos', r.get_data(as_text=True))
+
+r = pedido(consulta_customizada='')
+corpo = r.get_json()
+checar('pedido sem tipo de atendimento pergunta o tipo',
+       corpo['status'] == 'dados_incompletos' and 'consulta_customizada' in corpo['faltando']
+       and 'tipo de atendimento' in corpo['mensagem'], r.get_data(as_text=True))
+
+r = pedido(nome_paciente='', consulta_customizada='', data_hora='')
+corpo = r.get_json()
+checar('pedido sem nada pergunta nome, tipo e data juntos',
+       sorted(corpo['faltando']) == ['consulta_customizada', 'data_hora', 'nome_paciente'],
+       r.get_data(as_text=True))
+
+r = pedido()
+corpo = r.get_json()
+checar('horário livre é confirmado', r.status_code == 200 and corpo['status'] == 'confirmado',
+       r.get_data(as_text=True))
+checar('confirmação traz mensagem pronta para o WhatsApp', 'confirmada' in corpo['mensagem'])
+
+r = cliente.post('/agendamentos/', json={'data_hora': vago_dia.isoformat(), 'duracao_minutos': 30},
+                 headers=auth(ze_token))
+vago_id = r.get_json()['id']
+cliente.post('/agendamentos/', json={'data_hora': vago_outro.isoformat(), 'duracao_minutos': 30},
+             headers=auth(ze_token))
+
+r = pedido(nome_paciente='Bruno', data_hora=vago_dia.isoformat())
+checar('pedido no horário vago vira encaixe',
+       r.status_code == 200 and r.get_json()['status'] == 'encaixado', r.get_data(as_text=True))
+r = cliente.get('/agendamentos/', headers=auth(ze_token))
+encaixado = [a for a in r.get_json() if a['id'] == vago_id]
+checar('horário vago ficou marcado como encaixe com o paciente',
+       bool(encaixado) and encaixado[0].get('encaixe') is True
+       and encaixado[0].get('paciente_nome') == 'Bruno', str(encaixado))
+
+r = pedido(nome_paciente='Diego')
+corpo = r.get_json()
+checar('horário ocupado devolve conflito com alternativas',
+       r.status_code == 200 and corpo['status'] == 'conflito' and len(corpo['alternativas']) >= 1,
+       r.get_data(as_text=True))
+sugeridos = [datetime.fromisoformat(x['data_hora']) for x in corpo['alternativas']]
+checar('sugere 3 horários livres sem sobrepor a consulta de 15 minutos',
+       len(sugeridos) == 3 and all(abs((x - amanha).total_seconds()) >= 15 * 60 for x in sugeridos),
+       str(sugeridos))
+checar('o horário mais próximo sugerido é 15 minutos depois ou antes',
+       min(abs((x - amanha).total_seconds()) for x in sugeridos) == 15 * 60, str(sugeridos))
+r = pedido(nome_paciente='Eva', data_hora=(amanha + timedelta(minutes=10)).isoformat())
+checar('pedido 10 minutos depois da consulta de 15 minutos é conflito',
+       r.get_json()['status'] == 'conflito', r.get_data(as_text=True))
+r = pedido(nome_paciente='Eva', data_hora=(amanha + timedelta(minutes=15)).isoformat())
+checar('pedido 15 minutos depois é aceito', r.get_json()['status'] == 'confirmado',
+       r.get_data(as_text=True))
+
+r = pedido(data_hora=(datetime.now() - timedelta(days=1)).isoformat())
+checar('data passada devolve data_invalida',
+       r.status_code == 200 and r.get_json()['status'] == 'data_invalida')
+
+r = pedido(dentista_id=999999)
+checar('dentista inexistente retorna 400', r.status_code == 400)
+
+
 print('\n' + '=' * 60)
 if falhas:
     print(f'{len(falhas)} FALHA(S):')

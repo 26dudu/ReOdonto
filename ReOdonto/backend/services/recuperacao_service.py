@@ -22,12 +22,13 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
-from sqlalchemy import func
 
-from database.db import db
-from models.dentista_model import Dentista
-from models.paciente_model import Paciente
 from models.recuperacao_senha_model import RecuperacaoSenha
+from repositories import (
+    dentista_repository,
+    paciente_repository,
+    recuperacao_repository as repo,
+)
 from services import email_service
 from services.email_service import MailboxNaoAcessivel
 from utils.crypto import decrypt_data, hash_data
@@ -56,13 +57,11 @@ def _buscar_conta(email: str):
     if not email_limpo:
         return None, None
 
-    dentista = Dentista.query.filter(
-        func.lower(Dentista.email) == email_limpo.lower()
-    ).first()
+    dentista = dentista_repository.buscar_por_email(email_limpo)
     if dentista:
         return dentista, dentista.email
 
-    paciente = Paciente.query.filter_by(email_hash=hash_data(email_limpo)).first()
+    paciente = paciente_repository.buscar_por_email_hash(hash_data(email_limpo))
     if paciente:
         return paciente, decrypt_data(paciente.email)
 
@@ -74,10 +73,7 @@ def _gerar_codigo_unico():
     for _ in range(MAX_TENTATIVAS_COLISAO):
         candidato = str(secrets.randbelow(1_000_000)).zfill(6)
         candidato_hash = hash_data(candidato)
-        colisao = RecuperacaoSenha.query.filter_by(
-            codigo_hash=candidato_hash, usado=False
-        ).first()
-        if not colisao:
+        if not repo.existe_codigo_ativo(candidato_hash):
             return candidato, candidato_hash
     return None, None
 
@@ -98,10 +94,7 @@ def solicitar_codigo(email: str) -> str:
     email_hash = hash_data(email)
     uma_hora_atras = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
 
-    tentativas = RecuperacaoSenha.query.filter(
-        RecuperacaoSenha.email_hash == email_hash,
-        RecuperacaoSenha.criado_em >= uma_hora_atras,
-    ).count()
+    tentativas = repo.contar_pedidos_desde(email_hash, uma_hora_atras)
     if tentativas >= MAX_TENTATIVAS_POR_HORA:
         logger.warning(
             'Rate-limit atingido para email_hash=%s (%d pedidos na ultima hora)',
@@ -110,14 +103,11 @@ def solicitar_codigo(email: str) -> str:
         return LIMITE_EXCEDIDO
 
     # Invalida os OTPs ativos anteriores — só o mais novo vale.
-    RecuperacaoSenha.query.filter_by(email_hash=email_hash, usado=False).update(
-        {'usado': True}
-    )
-    db.session.flush()
+    repo.invalidar_codigos_ativos(email_hash)
 
     codigo, codigo_hash = _gerar_codigo_unico()
     if not codigo:
-        db.session.rollback()
+        repo.desfazer()
         logger.error(
             'Nao foi possivel gerar OTP unico apos %d tentativas', MAX_TENTATIVAS_COLISAO
         )
@@ -129,8 +119,8 @@ def solicitar_codigo(email: str) -> str:
         expira_em=datetime.now(timezone.utc) + timedelta(minutes=VALIDADE_MINUTOS),
         usado=False,
     )
-    db.session.add(registro)
-    db.session.commit()
+    repo.adicionar(registro)
+    repo.confirmar()
 
     try:
         email_service.enviar_codigo(email_destino, codigo)
@@ -154,9 +144,7 @@ def redefinir(email: str, codigo: str, nova_senha: str) -> None:
     codigo_hash = hash_data(codigo)
 
     registro_valido = None
-    for registro in RecuperacaoSenha.query.filter_by(
-        email_hash=email_hash, usado=False
-    ).all():
+    for registro in repo.listar_codigos_ativos(email_hash):
         if hmac.compare_digest(registro.codigo_hash, codigo_hash) and registro.esta_valido():
             registro_valido = registro
             break
@@ -173,4 +161,4 @@ def redefinir(email: str, codigo: str, nova_senha: str) -> None:
     conta.senha = bcrypt.hashpw(
         nova_senha.encode('utf-8'), bcrypt.gensalt()
     ).decode('utf-8')
-    db.session.commit()
+    repo.confirmar()

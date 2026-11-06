@@ -55,6 +55,10 @@ Todas as funcionalidades abaixo existem no back-end **e** funcionam na tela do f
 19. **Catálogo de tipos de consulta** — `/consultas` com nome, descrição, valor e duração; a escrita é restrita a dentistas.
 20. **Consulta de endereço por CEP** — `GET /cep/<cep>`, integração com a BrasilAPI para logradouro, bairro, cidade e estado (o app consulta a BrasilAPI diretamente).
 
+#### Integração por WhatsApp
+
+21. **Agendamento automático por WhatsApp (n8n + IA)** — o paciente pede a consulta por mensagem; o n8n interpreta o pedido com IA e chama `POST /integracoes/whatsapp/agendar` (protegida por chave de API). A API confirma o horário, encaixa o paciente em um horário vago aberto por cancelamento ou devolve alternativas quando há conflito, sempre com uma resposta pronta para o WhatsApp. Detalhes e workflow em [`n8n/README.md`](n8n/README.md).
+
 ---
 
 ## Como rodar o back-end
@@ -123,11 +127,60 @@ classDiagram
         +to_dict_completo() dict
     }
 
+    class Paciente {
+        +int id
+        +String nome
+        +String email
+        +String telefone
+        +String cpf
+        +to_dict() dict
+    }
+
+    class Consulta {
+        +int id
+        +String nome
+        +String descricao
+        +float valor
+        +int duracao_minutos
+        +to_dict() dict
+    }
+
+    class RecuperacaoSenha {
+        +int id
+        +String email_hash
+        +String codigo_hash
+        +DateTime expira_em
+        +bool usado
+        +esta_valido() bool
+    }
+
     Dentista "1" --> "0..*" Agendamento : possui
     Clinica "0..1" --> "0..*" Agendamento : sedia
 ```
 
+`Paciente` guarda os dados criptografados e `Consulta` é o catálogo de tipos de consulta. `RecuperacaoSenha` guarda o código OTP (somente o hash) usado para redefinir a senha de dentista ou paciente.
+
 `status` pode ser `agendado`, `concluido` ou `cancelado`. Um agendamento sem `nome_paciente` representa um horário vago. O diagrama é renderizado diretamente no GitHub e GitLab via [Mermaid](mermaid.js.org).
+
+---
+
+## Arquitetura em camadas
+
+O back-end separa as responsabilidades em quatro camadas. A requisição desce até o banco e a resposta volta pelo mesmo caminho:
+
+```
+Controller  →  Service  →  Repository  →  Model (SQLAlchemy)  →  SQLite
+ (HTTP)      (regras)     (consultas)       (entidades)
+```
+
+1. **Controller** (`controllers/`) recebe a requisição HTTP, valida o token e devolve o JSON.
+2. **Service** (`services/`) aplica as regras do caso de uso, como conflito de horário e validação de CPF.
+3. **Repository** (`repositories/`) concentra toda consulta e gravação no banco; nenhuma outra camada fala direto com o SQLAlchemy.
+4. **Model** (`models/`) representa as tabelas.
+
+Exemplo, cancelar uma consulta (`PATCH /agendamentos/<id>/status`): o controller confere se o agendamento é do dentista logado; o service muda o status e decide abrir um horário vago; o repository busca o agendamento, grava o vago e confirma a transação.
+
+O app Flutter e a API são independentes: o front só consome a API por requisições HTTP.
 
 ---
 
@@ -139,25 +192,28 @@ ReOdonto/
 │   ├── assets/icons/
 │   ├── web/ android/ ios/ ...    ← plataformas suportadas
 │   └── lib/
-│       ├── main.dart             ← rotas e tema do app
-│       ├── pages/                ← telas (login, cadastro, agenda, perfil, menu)
-│       ├── widgets/              ← componentes (agenda, cadastro, perfil, painel)
-│       ├── services/             ← api_service, sessao_usuario
-│       ├── models/               ← agendamento, resumo_painel
-│       ├── utils/                ← máscaras, validadores, formatadores
-│       └── theme/                ← paleta de cores
-└── backend/
-    ├── app.py                    ← aplicação Flask e registro dos Blueprints
-    ├── seed.py                   ← cria a clínica inicial
-    ├── requirements.txt
-    ├── controllers/              ← rotas HTTP (Blueprints Flask)
-    ├── models/                   ← entidades SQLAlchemy
-    ├── services/                 ← regras de negócio
-    ├── utils/                    ← criptografia e autorização (auth.py)
-    ├── tests/                    ← teste de fumaça dos fluxos principais
-    └── database/
-        ├── db.py
-        └── create_database.sql
+│   ├── main.dart             ← rotas e tema do app
+│   ├── pages/                ← telas (login, cadastro, agenda, perfil, menu)
+│   ├── widgets/              ← componentes (agenda, cadastro, perfil, painel)
+│   ├── services/             ← api_service, sessao_usuario
+│   ├── models/               ← agendamento, resumo_painel
+│   ├── utils/                ← máscaras, validadores, formatadores
+│   └── theme/                ← paleta de cores
+├── backend/
+│   ├── app.py                    ← aplicação Flask e registro dos Blueprints
+│   ├── seed.py                   ← cria a clínica inicial
+│   ├── requirements.txt
+│   ├── controllers/              ← rotas HTTP (Blueprints Flask)
+│   ├── models/                   ← entidades SQLAlchemy
+│   ├── services/                 ← regras de negócio
+│   ├── repositories/             ← consultas e gravações no banco
+│   ├── utils/                    ← criptografia e autorização (auth.py)
+│   ├── tests/                    ← teste de fumaça dos fluxos principais
+│   └── database/
+│       ├── db.py
+│       └── create_database.sql
+├── n8n/                          ← workflow de agendamento por WhatsApp
+└── .env.example
 ```
 
 ---

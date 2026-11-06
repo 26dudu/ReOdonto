@@ -1,5 +1,5 @@
-from database.db import db
 from models.clinica_model import Clinica
+from repositories import clinica_repository as repo
 
 
 def criar_clinica(data):
@@ -18,25 +18,25 @@ def criar_clinica(data):
         cidade=data.get('cidade'),
         estado=data.get('estado'),
     )
-    db.session.add(clinica)
-    db.session.commit()
+    repo.adicionar(clinica)
+    repo.confirmar()
     return clinica
 
 
 def listar_clinicas():
-    return Clinica.query.all()
+    return repo.listar_todos()
 
 
 def listar_clinicas_paginado(page=1, per_page=20):
-    return Clinica.query.paginate(page=page, per_page=per_page, error_out=False)
+    return repo.listar_paginado(page, per_page)
 
 
 def buscar_clinica(id):
-    return db.get_or_404(Clinica, id)
+    return repo.buscar_ou_404(id)
 
 
 def atualizar_clinica(id, data):
-    clinica = db.get_or_404(Clinica, id)
+    clinica = repo.buscar_ou_404(id)
 
     if data.get('nome'):
         clinica.nome = data['nome']
@@ -57,11 +57,11 @@ def atualizar_clinica(id, data):
     if data.get('estado') is not None:
         clinica.estado = data['estado']
 
-    db.session.commit()
+    repo.confirmar()
     return clinica
 
 
 def deletar_clinica(id):
-    clinica = db.get_or_404(Clinica, id)
-    db.session.delete(clinica)
-    db.session.commit()
+    clinica = repo.buscar_ou_404(id)
+    repo.remover(clinica)
+    repo.confirmar()

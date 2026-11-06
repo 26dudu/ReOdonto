@@ -36,10 +36,9 @@ from flask_jwt_extended import create_access_token
 from requests_oauthlib import OAuth2Session
 from google.oauth2 import id_token
 import requests
-from sqlalchemy import func
 
 import services.dentista_service as dentista_service
-from models.dentista_model import Dentista
+from repositories import dentista_repository
 
 logger = logging.getLogger(__name__)
 
@@ -139,9 +138,7 @@ def _entrar_como_dentista(email, nome):
     senha, mas pode definir uma depois pela recuperação de senha. Isso não abre
     nada novo: o cadastro de dentista em POST /dentistas/ já é público.
     """
-    dentista = Dentista.query.filter(
-        func.lower(Dentista.email) == email.strip().lower()
-    ).first()
+    dentista = dentista_repository.buscar_por_email(email)
     if dentista:
         logger.info('Dentista existente entrou com Google: %s', email)
     else:

@@ -1,5 +1,5 @@
-from database.db import db
 from models.consulta_model import Consulta
+from repositories import consulta_repository as repo
 
 
 def criar_consulta(data):
@@ -23,21 +23,21 @@ def criar_consulta(data):
         valor=valor,
         duracao_minutos=data.get('duracao_minutos'),
     )
-    db.session.add(consulta)
-    db.session.commit()
+    repo.adicionar(consulta)
+    repo.confirmar()
     return consulta
 
 
 def listar_consultas():
-    return Consulta.query.all()
+    return repo.listar_todos()
 
 
 def buscar_consulta(id):
-    return db.get_or_404(Consulta, id)
+    return repo.buscar_ou_404(id)
 
 
 def atualizar_consulta(id, data):
-    consulta = db.get_or_404(Consulta, id)
+    consulta = repo.buscar_ou_404(id)
 
     if data.get('nome'):
         consulta.nome = data['nome']
@@ -54,11 +54,11 @@ def atualizar_consulta(id, data):
     if data.get('duracao_minutos') is not None:
         consulta.duracao_minutos = data['duracao_minutos']
 
-    db.session.commit()
+    repo.confirmar()
     return consulta
 
 
 def deletar_consulta(id):
-    consulta = db.get_or_404(Consulta, id)
-    db.session.delete(consulta)
-    db.session.commit()
+    consulta = repo.buscar_ou_404(id)
+    repo.remover(consulta)
+    repo.confirmar()

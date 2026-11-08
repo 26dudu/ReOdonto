@@ -16,8 +16,7 @@ def _chave_valida():
     return hmac.compare_digest(enviada, esperada)
 
 
-@integracao_bp.route('/whatsapp/agendar', methods=['POST'])
-def agendar_por_whatsapp():
+def _executar(acao):
     valida = _chave_valida()
     if valida is None:
         return jsonify({'erro': 'Integração desativada: defina INTEGRACAO_API_KEY'}), 503
@@ -29,6 +28,16 @@ def agendar_por_whatsapp():
         return jsonify({'erro': 'Body deve ser JSON válido'}), 400
 
     try:
-        return jsonify(whatsapp_service.agendar(data)), 200
+        return jsonify(acao(data)), 200
     except ValueError as e:
         return jsonify({'erro': str(e)}), 400
+
+
+@integracao_bp.route('/whatsapp/agendar', methods=['POST'])
+def agendar_por_whatsapp():
+    return _executar(whatsapp_service.agendar)
+
+
+@integracao_bp.route('/whatsapp/cancelar', methods=['POST'])
+def cancelar_por_whatsapp():
+    return _executar(whatsapp_service.cancelar)

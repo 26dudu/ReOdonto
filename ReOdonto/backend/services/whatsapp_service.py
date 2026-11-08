@@ -1,6 +1,7 @@
+import re
 from datetime import datetime, timedelta
 
-from repositories import dentista_repository
+from repositories import agendamento_repository, dentista_repository
 from services import agendamento_service
 
 DURACAO_WHATSAPP_MINUTOS = 15
@@ -154,3 +155,61 @@ def agendar(data):
             'Pode sugerir outra data?'
         )
     return _resposta('conflito', mensagem, alternativas=_alternativas(sugestoes))
+
+
+def _chave_telefone(numero):
+    digitos = re.sub(r'\D', '', numero or '')
+    if digitos.startswith('55') and len(digitos) > 11:
+        digitos = digitos[2:]
+    if len(digitos) < 10:
+        return ''
+    return digitos[:2] + digitos[-8:]
+
+
+def _lista_de_horarios(agendamentos):
+    rotulos = [a.data_hora.strftime('%d/%m às %H:%M') for a in agendamentos]
+    if len(rotulos) == 1:
+        return rotulos[0]
+    return ', '.join(rotulos[:-1]) + ' e ' + rotulos[-1]
+
+
+def cancelar(data):
+    dentista_id = data.get('dentista_id')
+    chave = _chave_telefone(data.get('telefone_paciente'))
+    if not dentista_id or not chave:
+        raise ValueError('dentista_id e telefone_paciente são obrigatórios')
+
+    if not dentista_repository.buscar_por_id(dentista_id):
+        raise ValueError(f'Dentista {dentista_id} não encontrado')
+
+    agora = datetime.now()
+    minhas = [
+        a for a in agendamento_repository.listar_agendados_futuros(dentista_id, agora)
+        if _chave_telefone(a.telefone_paciente) == chave
+    ]
+    if not minhas:
+        return _resposta(
+            'nao_encontrado',
+            'Não encontrei nenhuma consulta agendada para o seu número.',
+        )
+
+    alvo = minhas[0] if len(minhas) == 1 else None
+    if alvo is None and data.get('data_hora'):
+        pedido = agendamento_service._ler_data_hora(data['data_hora'])
+        alvo = next((a for a in minhas if a.data_hora == pedido), None)
+
+    if alvo is None:
+        return _resposta(
+            'escolher',
+            f'Você tem mais de uma consulta agendada: {_lista_de_horarios(minhas)}. '
+            'Me diga o dia e o horário da que você quer cancelar.',
+            consultas=[{'id': a.id, 'data_hora': a.data_hora.isoformat()} for a in minhas],
+        )
+
+    agendamento, horario_liberado = agendamento_service.atualizar_status(alvo.id, 'cancelado')
+    return _resposta(
+        'cancelado',
+        f'Sua consulta de {agendamento.data_hora.strftime("%d/%m às %H:%M")} foi cancelada. '
+        'Quando quiser remarcar, é só me dizer o dia e o horário.',
+        agendamento=agendamento.to_dict_completo(),
+    )

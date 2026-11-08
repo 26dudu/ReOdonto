@@ -389,6 +389,64 @@ checar('data passada devolve data_invalida',
 r = pedido(dentista_id=999999)
 checar('dentista inexistente retorna 400', r.status_code == 400)
 
+print('\n--- Cancelamento por WhatsApp ---')
+
+
+def cancelar(telefone, **extra):
+    corpo = {'dentista_id': ze_id, 'telefone_paciente': telefone}
+    corpo.update(extra)
+    return cliente.post('/integracoes/whatsapp/cancelar', json=corpo, headers=chave)
+
+
+r = cliente.post('/integracoes/whatsapp/cancelar', json={})
+checar('cancelar sem chave de API retorna 401', r.status_code == 401)
+
+r = cancelar('5531900000999')
+checar('cancelar sem consulta devolve nao_encontrado',
+       r.status_code == 200 and r.get_json()['status'] == 'nao_encontrado', r.get_data(as_text=True))
+
+dia1 = amanha + timedelta(days=1)
+while dia1.weekday() >= 5:
+    dia1 += timedelta(days=1)
+dia2 = dia1 + timedelta(days=1)
+while dia2.weekday() >= 5:
+    dia2 += timedelta(days=1)
+tel = '5531977770001'
+r = pedido(nome_paciente='Paula', telefone_paciente=tel, data_hora=dia1.isoformat())
+checar('prepara a consulta da Paula', r.get_json()['status'] == 'confirmado', r.get_data(as_text=True))
+
+r = cancelar('31 97777-0001')
+corpo = r.get_json()
+checar('cancela a única consulta do número, com telefone em outro formato',
+       r.status_code == 200 and corpo['status'] == 'cancelado', r.get_data(as_text=True))
+r = cliente.get('/agendamentos/', headers=auth(ze_token))
+doutor = [a for a in r.get_json() if a['data_hora'].startswith(dia1.strftime('%Y-%m-%dT%H:%M'))]
+checar('o horário cancelado vira horário vago na agenda',
+       any(a.get('vago') for a in doutor) and not any(a.get('paciente_nome') == 'Paula' for a in doutor),
+       str(doutor))
+
+r = cancelar(tel)
+checar('cancelar de novo devolve nao_encontrado', r.get_json()['status'] == 'nao_encontrado',
+       r.get_data(as_text=True))
+
+pedido(nome_paciente='Paula', telefone_paciente=tel, data_hora=dia1.isoformat())
+pedido(nome_paciente='Paula', telefone_paciente=tel, data_hora=dia2.isoformat())
+r = cancelar(tel)
+corpo = r.get_json()
+checar('com duas consultas, pergunta qual cancelar',
+       corpo['status'] == 'escolher' and len(corpo['consultas']) == 2, r.get_data(as_text=True))
+
+r = cancelar(tel, data_hora=dia2.isoformat())
+checar('com duas consultas e a data informada, cancela a escolhida',
+       r.get_json()['status'] == 'cancelado', r.get_data(as_text=True))
+r = cancelar(tel)
+checar('sobra só a outra consulta', r.get_json()['status'] == 'cancelado'
+       and r.get_json()['agendamento']['data_hora'].startswith(dia1.strftime('%Y-%m-%d')),
+       r.get_data(as_text=True))
+
+r = cliente.post('/integracoes/whatsapp/cancelar', json={'dentista_id': ze_id}, headers=chave)
+checar('cancelar sem telefone retorna 400', r.status_code == 400)
+
 
 print('\n' + '=' * 60)
 if falhas:

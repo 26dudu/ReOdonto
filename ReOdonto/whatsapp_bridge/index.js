@@ -23,7 +23,7 @@ const NUMERO_PAREAMENTO = (process.env.WHATSAPP_NUMERO_DENTISTA || '').replace(/
 const CONVERSAS = new Map();
 const VALIDADE_CONVERSA_MS = 15 * 60 * 1000;
 const MAX_FALAS = 8;
-const STATUS_FINAIS = ['confirmado', 'encaixado'];
+const STATUS_FINAIS = ['confirmado', 'encaixado', 'cancelado', 'nao_encontrado'];
 
 function registrarFala(telefone, quem, texto) {
   const agora = Date.now();

@@ -43,6 +43,20 @@ def buscar_vago_aberto(dentista_id, data_hora):
     ).first()
 
 
+def listar_agendados_futuros(dentista_id, agora):
+    return (
+        Agendamento.query
+        .filter(
+            Agendamento.dentista_id == dentista_id,
+            Agendamento.status == 'agendado',
+            Agendamento.nome_paciente.isnot(None),
+            Agendamento.data_hora >= agora,
+        )
+        .order_by(Agendamento.data_hora)
+        .all()
+    )
+
+
 def listar_vagos_futuros(dentista_id, agora):
     return (
         Agendamento.query

@@ -40,7 +40,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 1000, thinking: { type: 'disabled' }, system: \"Voce e a recepcionista virtual de uma clinica odontologica. Voce recebe a conversa recente com o paciente, com a mensagem mais recente por ultimo, e deve responder SOMENTE com um JSON valido, sem texto extra, com as chaves: data_hora (formato ISO 8601 'YYYY-MM-DDTHH:MM:00'), consulta (tipo de atendimento que o paciente pediu, como limpeza, clareamento ou avaliacao), nome (nome que o paciente informou). Use a conversa inteira; quando o paciente corrigir algo, a mensagem mais recente prevalece. Cada campo so deve ser preenchido se o paciente tiver dito explicitamente na conversa; se faltar qualquer informacao, use null nesse campo e NUNCA invente, assuma ou complete valores. data_hora so pode ser preenchido quando o paciente informou a data E o horario, ainda que em mensagens diferentes. Resolva datas relativas como 'amanha' e 'quinta' a partir da data e hora atual informada. Nao use o nome do perfil do WhatsApp, apenas o nome que o paciente escrever.\" + ' Agora: ' + $now.setZone('America/Sao_Paulo').toFormat(\"yyyy-MM-dd HH:mm (cccc)\"), messages: [{ role: 'user', content: $json.body.mensagem }] }) }}",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-haiku-5-5', max_tokens: 1000, thinking: { type: 'disabled' }, system: \"Voce e a recepcionista virtual de uma clinica odontologica. Voce recebe a conversa recente com o paciente, com a mensagem mais recente por ultimo, e deve responder SOMENTE com um JSON valido, sem texto extra, com as chaves: intencao, data_hora, consulta, nome. intencao: 'cancelar' se o paciente quer cancelar, desmarcar ou nao poder comparecer a uma consulta ja marcada; 'agendar' se quer marcar ou remarcar uma consulta; 'outro' para qualquer outra mensagem, como cumprimentos. data_hora (formato ISO 8601 'YYYY-MM-DDTHH:MM:00'): a data e o horario da consulta que o paciente quer marcar, ou, no caso de cancelamento, da consulta que ele quer cancelar, se ele disser. consulta: tipo de atendimento que o paciente pediu, como limpeza, clareamento ou avaliacao. nome: nome que o paciente informou. Use a conversa inteira; quando o paciente corrigir algo, a mensagem mais recente prevalece. Cada campo so deve ser preenchido se o paciente tiver dito explicitamente na conversa; se faltar qualquer informacao, use null nesse campo e NUNCA invente, assuma ou complete valores. data_hora so pode ser preenchido quando o paciente informou a data E o horario, ainda que em mensagens diferentes. Resolva datas relativas como 'amanha' e 'quinta' a partir da data e hora atual informada. Nao use o nome do perfil do WhatsApp, apenas o nome que o paciente escrever.\" + ' Agora: ' + $now.setZone('America/Sao_Paulo').toFormat(\"yyyy-MM-dd HH:mm (cccc)\"), messages: [{ role: 'user', content: $json.body.mensagem }] }) }}",
         "options": {}
       },
       "name": "IA extrai data e tipo",
@@ -53,7 +53,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const entrada = $('Webhook WhatsApp').first().json.body;\nconst bloco = ($input.first().json.content || []).find((b) => b.type === 'text');\nconst texto = bloco ? bloco.text : '';\nlet dados = {};\ntry {\n  dados = JSON.parse(texto.match(/\\{[\\s\\S]*\\}/)[0]);\n} catch (e) {\n  dados = {};\n}\nreturn [{\n  json: {\n    dentista_id: Number(entrada.dentista_id || $env.DENTISTA_ID_PADRAO),\n    nome_paciente: dados.nome || '',\n    telefone_paciente: entrada.telefone || '',\n    data_hora: dados.data_hora || '',\n    consulta_customizada: dados.consulta || '',\n    telefone_resposta: entrada.telefone || ''\n  }\n}];"
+        "jsCode": "const entrada = $('Webhook WhatsApp').first().json.body;\nconst bloco = ($input.first().json.content || []).find((b) => b.type === 'text');\nconst texto = bloco ? bloco.text : '';\nlet dados = {};\ntry {\n  dados = JSON.parse(texto.match(/\\{[\\s\\S]*\\}/)[0]);\n} catch (e) {\n  dados = {};\n}\nreturn [{\n  json: {\n    intencao: dados.intencao || 'outro',\n    dentista_id: Number(entrada.dentista_id || $env.DENTISTA_ID_PADRAO),\n    nome_paciente: dados.nome || '',\n    telefone_paciente: entrada.telefone || '',\n    data_hora: dados.data_hora || '',\n    consulta_customizada: dados.consulta || '',\n    telefone_resposta: entrada.telefone || ''\n  }\n}];"
       },
       "name": "Interpretar mensagem",
       "type": "n8n-nodes-base.code",
@@ -85,8 +85,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        720,
-        0
+        840,
+        140
       ]
     },
     {
@@ -113,6 +113,63 @@
       "position": [
         1200,
         0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "intencao-cancelar",
+              "leftValue": "={{ $json.intencao }}",
+              "rightValue": "cancelar",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Quer cancelar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        600,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.REODONTO_API_URL }}/integracoes/whatsapp/cancelar",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.INTEGRACAO_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dentista_id: $json.dentista_id, telefone_paciente: $json.telefone_paciente, data_hora: $json.data_hora }) }}",
+        "options": {}
+      },
+      "name": "Cancelar no ReOdonto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        -140
       ]
     }
   ],
@@ -143,7 +200,7 @@
       "main": [
         [
           {
-            "node": "Agendar no ReOdonto",
+            "node": "Quer cancelar?",
             "type": "main",
             "index": 0
           }
@@ -166,6 +223,35 @@
         [
           {
             "node": "Responder ao WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quer cancelar?": {
+      "main": [
+        [
+          {
+            "node": "Cancelar no ReOdonto",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agendar no ReOdonto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar no ReOdonto": {
+      "main": [
+        [
+          {
+            "node": "Montar resposta",
             "type": "main",
             "index": 0
           }

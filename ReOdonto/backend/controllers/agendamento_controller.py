@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, g
 
+import services.adiantamento_service as adiantamento_service
 import services.agendamento_service as service
 from utils.auth import dentista_required
 
@@ -89,6 +90,9 @@ def atualizar_status(id):
         agendamento, horario_vago = service.atualizar_status(id, novo_status)
     except ValueError as e:
         return jsonify({'erro': str(e)}), 400
+
+    if horario_vago:
+        adiantamento_service.oferecer(horario_vago)
 
     resposta = agendamento.to_dict_completo()
     resposta['horario_liberado'] = (

@@ -1,8 +1,8 @@
-import re
 from datetime import datetime, timedelta
 
 from repositories import agendamento_repository, dentista_repository
-from services import agendamento_service
+from services import adiantamento_service, agendamento_service
+from utils.telefone import chave_telefone as _chave_telefone
 
 DURACAO_WHATSAPP_MINUTOS = 15
 PASSO_MINUTOS = 15
@@ -157,15 +157,6 @@ def agendar(data):
     return _resposta('conflito', mensagem, alternativas=_alternativas(sugestoes))
 
 
-def _chave_telefone(numero):
-    digitos = re.sub(r'\D', '', numero or '')
-    if digitos.startswith('55') and len(digitos) > 11:
-        digitos = digitos[2:]
-    if len(digitos) < 10:
-        return ''
-    return digitos[:2] + digitos[-8:]
-
-
 def _lista_de_horarios(agendamentos):
     rotulos = [a.data_hora.strftime('%d/%m às %H:%M') for a in agendamentos]
     if len(rotulos) == 1:
@@ -207,9 +198,23 @@ def cancelar(data):
         )
 
     agendamento, horario_liberado = agendamento_service.atualizar_status(alvo.id, 'cancelado')
+    adiantamento_service.oferecer(horario_liberado)
     return _resposta(
         'cancelado',
         f'Sua consulta de {agendamento.data_hora.strftime("%d/%m às %H:%M")} foi cancelada. '
         'Quando quiser remarcar, é só me dizer o dia e o horário.',
         agendamento=agendamento.to_dict_completo(),
     )
+
+
+def responder_oferta(data):
+    dentista_id = data.get('dentista_id')
+    telefone = data.get('telefone_paciente')
+    resposta = data.get('resposta')
+    if not dentista_id or not _chave_telefone(telefone):
+        raise ValueError('dentista_id e telefone_paciente são obrigatórios')
+    if resposta not in ('aceitar_oferta', 'recusar_oferta'):
+        raise ValueError("resposta deve ser 'aceitar_oferta' ou 'recusar_oferta'")
+    if not dentista_repository.buscar_por_id(dentista_id):
+        raise ValueError(f'Dentista {dentista_id} não encontrado')
+    return adiantamento_service.responder(dentista_id, telefone, resposta == 'aceitar_oferta')

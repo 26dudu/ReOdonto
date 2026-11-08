@@ -58,6 +58,7 @@ Todas as funcionalidades abaixo existem no back-end **e** funcionam na tela do f
 #### Integração por WhatsApp
 
 21. **Agendamento automático por WhatsApp (n8n + IA)** — o paciente pede a consulta por mensagem; o n8n interpreta o pedido com IA e chama `POST /integracoes/whatsapp/agendar` (protegida por chave de API). A API confirma o horário, encaixa o paciente em um horário vago aberto por cancelamento ou devolve alternativas quando há conflito, sempre com uma resposta pronta para o WhatsApp. Detalhes e workflow em [`n8n/README.md`](n8n/README.md).
+22. **Aviso automático para adiantar consultas** — quando uma consulta é cancelada, o horário vago é oferecido por WhatsApp ao próximo paciente agendado (até 7 dias depois, com telefone cadastrado e que não seja quem cancelou). Se ele responder SIM, a consulta é movida para o horário vago e o horário antigo vira vago, repetindo o aviso até 2 rodadas. Se responder NÃO ou a oferta expirar (30 minutos), ela segue para o próximo. As ofertas ficam na tabela `oferta_adiantamento`.
 
 ---
 

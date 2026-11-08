@@ -43,6 +43,34 @@ def buscar_vago_aberto(dentista_id, data_hora):
     ).first()
 
 
+def buscar_por_id(id):
+    return db.session.get(Agendamento, id)
+
+
+def listar_agendados_entre(dentista_id, depois_de, ate):
+    return (
+        Agendamento.query
+        .filter(
+            Agendamento.dentista_id == dentista_id,
+            Agendamento.status == 'agendado',
+            Agendamento.nome_paciente.isnot(None),
+            Agendamento.data_hora > depois_de,
+            Agendamento.data_hora <= ate,
+        )
+        .order_by(Agendamento.data_hora)
+        .all()
+    )
+
+
+def listar_cancelados_em(dentista_id, data_hora):
+    return Agendamento.query.filter(
+        Agendamento.dentista_id == dentista_id,
+        Agendamento.status == 'cancelado',
+        Agendamento.nome_paciente.isnot(None),
+        Agendamento.data_hora == data_hora,
+    ).all()
+
+
 def listar_agendados_futuros(dentista_id, agora):
     return (
         Agendamento.query

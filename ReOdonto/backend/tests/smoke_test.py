@@ -294,6 +294,10 @@ checar('segundo login Google reusa a mesma conta',
 
 print('\n--- Agendamento por WhatsApp (n8n) ---')
 os.environ['INTEGRACAO_API_KEY'] = 'chave-de-teste-integracao'
+from services import ponte_whatsapp  # noqa: E402
+enviadas = []
+ponte_whatsapp.ASSINCRONO = False
+ponte_whatsapp.enviar = lambda tel, msg: enviadas.append((tel, msg)) or True
 chave = {'X-API-Key': 'chave-de-teste-integracao'}
 r = cliente.post('/dentistas/', json={
     'nome': 'Dr. Zé', 'email': 'ze@clinica.com', 'senha': 'SenhaForte1',
@@ -446,6 +450,99 @@ checar('sobra só a outra consulta', r.get_json()['status'] == 'cancelado'
 
 r = cliente.post('/integracoes/whatsapp/cancelar', json={'dentista_id': ze_id}, headers=chave)
 checar('cancelar sem telefone retorna 400', r.status_code == 400)
+
+print('\n--- Adiantamento: avisar o próximo paciente ---')
+
+
+def oferta(tel, resposta):
+    return cliente.post('/integracoes/whatsapp/oferta', json={
+        'dentista_id': ze_id, 'telefone_paciente': tel, 'resposta': resposta}, headers=chave)
+
+
+base = amanha + timedelta(days=20)
+while base.weekday() >= 5:
+    base += timedelta(days=1)
+h10 = base.replace(hour=10, minute=0)
+h11 = base.replace(hour=11, minute=0)
+h14 = base.replace(hour=14, minute=0)
+tel_a, tel_b, tel_c = '5531977771001', '5531977772002', '5531977773003'
+for nome_p, tel_p, quando in (('Ana', tel_a, h10), ('Bruno', tel_b, h11), ('Carla', tel_c, h14)):
+    r = pedido(nome_paciente=nome_p, telefone_paciente=tel_p, data_hora=quando.isoformat(),
+               consulta_customizada='Limpeza')
+    checar(f'prepara a consulta de {nome_p}', r.get_json()['status'] == 'confirmado', r.get_data(as_text=True))
+
+r = oferta(tel_c, 'aceitar_oferta')
+checar('responder sem oferta pendente devolve sem_oferta', r.get_json()['status'] == 'sem_oferta',
+       r.get_data(as_text=True))
+r = cliente.post('/integracoes/whatsapp/oferta', json={
+    'dentista_id': ze_id, 'telefone_paciente': tel_c, 'resposta': 'talvez'}, headers=chave)
+checar('resposta inválida retorna 400', r.status_code == 400)
+r = cliente.post('/integracoes/whatsapp/oferta', json={})
+checar('oferta sem chave de API retorna 401', r.status_code == 401)
+
+inicio = len(enviadas)
+r = cancelar(tel_a)
+checar('Ana cancela a consulta das 10h', r.get_json()['status'] == 'cancelado', r.get_data(as_text=True))
+novas = enviadas[inicio:]
+checar('o paciente seguinte (Bruno, 11h) recebe o aviso do horário vago',
+       len(novas) == 1 and novas[0][0] == tel_b and '10:00' in novas[0][1] and '11:00' in novas[0][1]
+       and 'SIM' in novas[0][1], str(novas))
+
+r = oferta(tel_b, 'aceitar_oferta')
+corpo = r.get_json()
+checar('Bruno aceita e a consulta é adiantada', corpo['status'] == 'adiantado'
+       and '10:00' in corpo['mensagem'], r.get_data(as_text=True))
+r = cliente.get('/agendamentos/', headers=auth(ze_token))
+dia = [a for a in r.get_json() if a['data_hora'].startswith(base.strftime('%Y-%m-%d'))]
+bruno = [a for a in dia if a.get('paciente_nome') == 'Bruno']
+checar('Bruno agora está às 10h e conta como horário recuperado',
+       len(bruno) == 1 and bruno[0]['data_hora'].endswith('10:00:00') and bruno[0].get('encaixe') is True,
+       str(dia))
+checar('o horário das 11h ficou vago', any(a.get('vago') and a['data_hora'].endswith('11:00:00') for a in dia),
+       str(dia))
+novas = enviadas[inicio:]
+checar('o adiantamento oferece o novo vago ao paciente seguinte (Carla, 14h)',
+       len(novas) == 2 and novas[1][0] == tel_c and '11:00' in novas[1][1] and '14:00' in novas[1][1],
+       str(novas))
+
+r = oferta(tel_c, 'recusar_oferta')
+checar('Carla recusa e a consulta continua', r.get_json()['status'] == 'oferta_recusada'
+       and '14:00' in r.get_json()['mensagem'], r.get_data(as_text=True))
+checar('sem mais candidatos, ninguém mais é avisado', len(enviadas) - inicio == 2, str(enviadas[inicio:]))
+r = oferta(tel_c, 'aceitar_oferta')
+checar('a oferta recusada não pode mais ser aceita', r.get_json()['status'] == 'sem_oferta',
+       r.get_data(as_text=True))
+
+print('\n--- Adiantamento: oferta expirada ---')
+inicio = len(enviadas)
+r = cancelar(tel_b)
+checar('Bruno cancela e Carla recebe nova oferta', r.get_json()['status'] == 'cancelado'
+       and len(enviadas) - inicio == 1 and enviadas[-1][0] == tel_c, str(enviadas[inicio:]))
+with app.app_context():
+    from repositories import oferta_repository as oferta_repo
+    for pendente in oferta_repo.listar_pendentes_do_dentista(ze_id):
+        pendente.expira_em = datetime.now() - timedelta(minutes=1)
+    oferta_repo.confirmar()
+r = oferta(tel_c, 'aceitar_oferta')
+checar('oferta vencida devolve oferta_expirada', r.get_json()['status'] == 'oferta_expirada',
+       r.get_data(as_text=True))
+r = cliente.get('/agendamentos/', headers=auth(ze_token))
+carla = [a for a in r.get_json() if a.get('telefone_paciente') == tel_c]
+checar('a consulta da Carla continua às 14h', len(carla) == 1 and carla[0]['data_hora'].endswith('14:00:00'),
+       str(carla))
+
+print('\n--- Adiantamento: não oferece a quem acabou de cancelar ---')
+tel_d = '5531977774004'
+d1 = base.replace(hour=15, minute=0)
+d2 = base.replace(hour=15, minute=15)
+for quando in (d1, d2):
+    pedido(nome_paciente='Davi', telefone_paciente=tel_d, data_hora=quando.isoformat(),
+           consulta_customizada='Limpeza')
+inicio = len(enviadas)
+r = cancelar(tel_d, data_hora=d1.isoformat())
+checar('Davi cancela a primeira consulta', r.get_json()['status'] == 'cancelado', r.get_data(as_text=True))
+checar('a segunda consulta do próprio Davi não recebe a oferta', len(enviadas) == inicio, str(enviadas[inicio:]))
+
 
 
 print('\n' + '=' * 60)

@@ -41,3 +41,8 @@ def agendar_por_whatsapp():
 @integracao_bp.route('/whatsapp/cancelar', methods=['POST'])
 def cancelar_por_whatsapp():
     return _executar(whatsapp_service.cancelar)
+
+
+@integracao_bp.route('/whatsapp/oferta', methods=['POST'])
+def responder_oferta_por_whatsapp():
+    return _executar(whatsapp_service.responder_oferta)

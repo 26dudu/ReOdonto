@@ -23,22 +23,101 @@ const NUMERO_PAREAMENTO = (process.env.WHATSAPP_NUMERO_DENTISTA || '').replace(/
 const CONVERSAS = new Map();
 const VALIDADE_CONVERSA_MS = 15 * 60 * 1000;
 const MAX_FALAS = 8;
-const STATUS_FINAIS = ['confirmado', 'encaixado', 'cancelado', 'nao_encontrado'];
+const STATUS_FINAIS = [
+  'confirmado',
+  'encaixado',
+  'cancelado',
+  'nao_encontrado',
+  'adiantado',
+  'oferta_recusada',
+  'oferta_expirada',
+  'oferta_indisponivel',
+  'sem_oferta',
+];
+const CHAVE_API = process.env.INTEGRACAO_API_KEY || '';
 
 function registrarFala(telefone, quem, texto) {
+  const chave = chaveDoNumero(telefone);
   const agora = Date.now();
-  const atuais = (CONVERSAS.get(telefone) || []).filter((f) => agora - f.em < VALIDADE_CONVERSA_MS);
+  const atuais = (CONVERSAS.get(chave) || []).filter((f) => agora - f.em < VALIDADE_CONVERSA_MS);
   atuais.push({ quem, texto, em: agora });
   const recentes = atuais.slice(-MAX_FALAS);
-  CONVERSAS.set(telefone, recentes);
+  CONVERSAS.set(chave, recentes);
   return recentes;
 }
 
+function limparConversa(telefone) {
+  CONVERSAS.delete(chaveDoNumero(telefone));
+}
+
+let sockAtual = null;
 let qrAtual = null;
 let codigoPareamento = null;
 let conectado = false;
 
+function lerCorpo(req) {
+  return new Promise((resolve, reject) => {
+    let dados = '';
+    req.on('data', (parte) => {
+      dados += parte;
+      if (dados.length > 100000) req.destroy();
+    });
+    req.on('end', () => resolve(dados));
+    req.on('error', reject);
+  });
+}
+
+async function resolverJid(telefone) {
+  let digitos = telefone.replace(/\D/g, '');
+  if (!digitos.startsWith('55') && (digitos.length === 10 || digitos.length === 11)) {
+    digitos = `55${digitos}`;
+  }
+  const candidatos = [digitos];
+  if (digitos.length === 13) candidatos.push(digitos.slice(0, 4) + digitos.slice(5));
+  if (digitos.length === 12) candidatos.push(`${digitos.slice(0, 4)}9${digitos.slice(4)}`);
+  for (const candidato of candidatos) {
+    const [resultado] = (await sockAtual.onWhatsApp(candidato)) || [];
+    if (resultado?.exists) return resultado.jid;
+  }
+  return null;
+}
+
+async function tratarEnvio(req, res) {
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  const responder = (codigo, corpo) => {
+    res.statusCode = codigo;
+    res.end(JSON.stringify(corpo));
+  };
+  if (!CHAVE_API || req.headers['x-api-key'] !== CHAVE_API) {
+    return responder(401, { erro: 'Chave de API inválida' });
+  }
+  if (!conectado || !sockAtual) {
+    return responder(503, { erro: 'WhatsApp não conectado' });
+  }
+  try {
+    const { telefone, mensagem } = JSON.parse(await lerCorpo(req));
+    if (!telefone || !mensagem) return responder(400, { erro: 'telefone e mensagem são obrigatórios' });
+    if (!PERMITIDOS.includes(chaveDoNumero(telefone))) {
+      console.log(`Envio recusado para ${telefone} (não está em WHATSAPP_NUMEROS_PERMITIDOS)`);
+      return responder(403, { erro: 'Número fora da lista de permitidos' });
+    }
+    const jid = await resolverJid(telefone);
+    if (!jid) return responder(404, { erro: 'Número sem WhatsApp' });
+    await sockAtual.sendMessage(jid, { text: mensagem });
+    registrarFala(telefone, 'Recepcionista', mensagem);
+    console.log(`[envio -> ${telefone}] ${mensagem}`);
+    return responder(200, { ok: true });
+  } catch (erro) {
+    console.error('Falha ao enviar:', erro.message);
+    return responder(500, { erro: 'Falha ao enviar' });
+  }
+}
+
 const servidor = http.createServer(async (req, res) => {
+  if (req.method === 'POST' && req.url === '/enviar') {
+    await tratarEnvio(req, res);
+    return;
+  }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   if (conectado) {
     res.end('<h2>WhatsApp conectado.</h2>');
@@ -91,6 +170,7 @@ async function iniciar() {
     browser: ['ReOdonto', 'Chrome', '1.0'],
   });
 
+  sockAtual = sock;
   sock.ev.on('creds.update', saveCreds);
 
   sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
@@ -155,7 +235,7 @@ async function iniciar() {
           await sock.sendMessage(jid, { text: resposta });
           console.log(`-> ${resultado.status}: ${resposta}`);
           if (STATUS_FINAIS.includes(resultado.status)) {
-            CONVERSAS.delete(telefone);
+            limparConversa(telefone);
           } else {
             registrarFala(telefone, 'Recepcionista', resposta);
           }

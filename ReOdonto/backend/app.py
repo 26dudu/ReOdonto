@@ -132,6 +132,7 @@ app.register_blueprint(integracao_bp)
 
 # --- Registra modelos adicionais para que db.create_all() crie as tabelas ---
 import models.recuperacao_senha_model  # noqa: F401 — registra tabela recuperacao_senha
+import models.oferta_model  # noqa: F401 — registra tabela oferta_adiantamento
 
 def _aplicar_colunas_novas():
     """

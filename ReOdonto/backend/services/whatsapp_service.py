@@ -184,27 +184,49 @@ def cancelar(data):
             'Não encontrei nenhuma consulta agendada para o seu número.',
         )
 
-    alvo = minhas[0] if len(minhas) == 1 else None
-    if alvo is None and data.get('data_hora'):
-        pedido = agendamento_service._ler_data_hora(data['data_hora'])
-        alvo = next((a for a in minhas if a.data_hora == pedido), None)
-
-    if alvo is None:
+    alvos = _escolher_alvos(minhas, data)
+    if not alvos:
         return _resposta(
             'escolher',
             f'Você tem mais de uma consulta agendada: {_lista_de_horarios(minhas)}. '
-            'Me diga o dia e o horário da que você quer cancelar.',
+            'Me diga o dia e o horário da que você quer cancelar, ou responda "todas".',
             consultas=[{'id': a.id, 'data_hora': a.data_hora.isoformat()} for a in minhas],
         )
 
-    agendamento, horario_liberado = agendamento_service.atualizar_status(alvo.id, 'cancelado')
-    adiantamento_service.oferecer(horario_liberado)
+    cancelados = []
+    for alvo in alvos:
+        agendamento, horario_liberado = agendamento_service.atualizar_status(alvo.id, 'cancelado')
+        adiantamento_service.oferecer(horario_liberado)
+        cancelados.append(agendamento)
+
+    if len(cancelados) == 1:
+        mensagem = (
+            f'Sua consulta de {cancelados[0].data_hora.strftime("%d/%m às %H:%M")} foi cancelada. '
+            'Quando quiser remarcar, é só me dizer o dia e o horário.'
+        )
+    else:
+        mensagem = (
+            f'Suas consultas de {_lista_de_horarios(cancelados)} foram canceladas. '
+            'Quando quiser remarcar, é só me dizer o dia e o horário.'
+        )
     return _resposta(
         'cancelado',
-        f'Sua consulta de {agendamento.data_hora.strftime("%d/%m às %H:%M")} foi cancelada. '
-        'Quando quiser remarcar, é só me dizer o dia e o horário.',
-        agendamento=agendamento.to_dict_completo(),
+        mensagem,
+        agendamento=cancelados[0].to_dict_completo(),
+        agendamentos=[a.to_dict_completo() for a in cancelados],
     )
+
+
+def _escolher_alvos(minhas, data):
+    if len(minhas) == 1:
+        return minhas
+    if data.get('cancelar_todas') is True:
+        return minhas
+    pedidos = [p for p in (data.get('datas_hora') or []) if p]
+    if not pedidos and data.get('data_hora'):
+        pedidos = [data['data_hora']]
+    horarios = {agendamento_service._ler_data_hora(p) for p in pedidos}
+    return [a for a in minhas if a.data_hora in horarios]
 
 
 def responder_oferta(data):

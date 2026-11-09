@@ -543,6 +543,53 @@ r = cancelar(tel_d, data_hora=d1.isoformat())
 checar('Davi cancela a primeira consulta', r.get_json()['status'] == 'cancelado', r.get_data(as_text=True))
 checar('a segunda consulta do próprio Davi não recebe a oferta', len(enviadas) == inicio, str(enviadas[inicio:]))
 
+print('\n--- Cancelamento de várias consultas ---')
+base3 = base + timedelta(days=3)
+while base3.weekday() >= 5:
+    base3 += timedelta(days=1)
+tel_e = '5531977775005'
+e1 = base3.replace(hour=9, minute=0)
+e2 = base3.replace(hour=11, minute=0)
+e3 = base3.replace(hour=13, minute=0)
+for quando in (e1, e2, e3):
+    pedido(nome_paciente='Elisa', telefone_paciente=tel_e, data_hora=quando.isoformat(),
+           consulta_customizada='Limpeza')
+
+r = cancelar(tel_e)
+corpo = r.get_json()
+checar('com três consultas, pergunta qual cancelar e oferece "todas"',
+       corpo['status'] == 'escolher' and len(corpo['consultas']) == 3 and 'todas' in corpo['mensagem'],
+       r.get_data(as_text=True))
+
+r = cancelar(tel_e, datas_hora=[e1.isoformat(), e3.isoformat()])
+corpo = r.get_json()
+checar('cancela duas consultas pela lista de horários',
+       corpo['status'] == 'cancelado' and len(corpo['agendamentos']) == 2 and 'foram canceladas' in corpo['mensagem'],
+       r.get_data(as_text=True))
+
+r = cliente.get('/agendamentos/', headers=auth(ze_token))
+da_elisa = [a for a in r.get_json() if a.get('telefone_paciente') == tel_e]
+checar('só a consulta das 11h continua marcada', len(da_elisa) == 1 and da_elisa[0]['data_hora'].endswith('11:00:00'),
+       str(da_elisa))
+
+tel_f = '5531977776006'
+f1 = base3.replace(hour=15, minute=0)
+f2 = base3.replace(hour=16, minute=0)
+for quando in (f1, f2):
+    pedido(nome_paciente='Fabio', telefone_paciente=tel_f, data_hora=quando.isoformat(),
+           consulta_customizada='Limpeza')
+r = cancelar(tel_f, cancelar_todas=True)
+corpo = r.get_json()
+checar('"todas" cancela todas as consultas do número',
+       corpo['status'] == 'cancelado' and len(corpo['agendamentos']) == 2, r.get_data(as_text=True))
+r = cancelar(tel_f)
+checar('depois disso não sobra nada para cancelar', r.get_json()['status'] == 'nao_encontrado',
+       r.get_data(as_text=True))
+
+r = cancelar(tel_e, datas_hora=[e1.isoformat()])
+checar('com uma consulta só, cancelar atinge essa consulta', r.get_json()['status'] == 'cancelado'
+       and r.get_json()['agendamento']['data_hora'].endswith('11:00:00'), r.get_data(as_text=True))
+
 
 
 print('\n' + '=' * 60)

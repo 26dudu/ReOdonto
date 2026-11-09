@@ -1,90 +1,131 @@
 # ReOdonto
 
-App para gerenciar a realocação de clientes de uma clínica odontológica, permitindo reorganizar consultas entre horários, cadeiras e dentistas disponíveis de forma rápida e organizada.
+Aplicativo para gerenciamento de agendamentos odontológicos e realocação de pacientes. O sistema ajuda dentistas a aproveitar horários que ficariam vagos após cancelamentos, realizar encaixes e acompanhar os resultados da agenda.
+
+**Público-alvo:** dentistas e profissionais responsáveis pela agenda de clínicas odontológicas.
+
+**Turma:** 3A2  
+**Integrantes:** Lucas Caldas, Arthur Munaier, Eduardo Aquino e Yslan Cirilo.
+
+---
+
+## Problema que o projeto busca resolver
+
+Quando um paciente cancela uma consulta, o horário pode ficar vazio e representar perda de atendimento e receita para a clínica. O ReOdonto permite registrar o cancelamento, liberar o horário, encaixar outro paciente e oferecer antecipações por WhatsApp. O painel reúne indicadores para acompanhar o aproveitamento da agenda.
 
 ## Tecnologias utilizadas
 
-- **Flutter** — front-end, interface para recepcionistas e atendentes acompanharem e remanejarem os agendamentos.
-- **Python / Flask** — back-end (API REST), responsável pelas regras de negócio e pela comunicação com o banco de dados.
-- **SQLite** — banco de dados, armazenamento dos dados de clientes, dentistas, horários e consultas.
+| Parte                   | Tecnologia                       | Utilização                                                           |
+| ----------------------- | -------------------------------- | -------------------------------------------------------------------- |
+| Frontend                | Flutter / Dart                   | Interface utilizada pelo dentista.                                   |
+| Backend                 | Python / Flask                   | API REST e regras de negócio.                                        |
+| Persistência            | SQLite / SQLAlchemy ORM          | Mapeamento das entidades e armazenamento dos dados.                  |
+| Autenticação            | JWT                              | Autenticação e proteção das rotas do dentista.                       |
+| Automação               | n8n                              | Orquestração do fluxo de mensagens do WhatsApp.                      |
+| Inteligência artificial | Claude, por meio do fluxo do n8n | Interpretação das solicitações de agendamento enviadas por mensagem. |
+| Integração externa      | WhatsApp e BrasilAPI             | Comunicação com pacientes e consulta de CEP.                         |
 
 ---
 
 ## Funcionalidades Implementadas
 
-Todas as funcionalidades abaixo existem no back-end **e** funcionam na tela do front-end. O app é de uso exclusivo do dentista.
+A lista abaixo reúne os fluxos e operações disponíveis no projeto. Para a avaliação, cada item deve ser verificado de ponta a ponta: interface ou entrada externa → API → Controller → Service → Model/Repository → banco de dados, conforme o tipo de funcionalidade.
 
-### Autenticação e Controle de Acesso
+### Autenticação e perfil do dentista
 
-1. **Cadastro de dentista** — fluxo em duas telas (dados pessoais → criação de senha) com nome, e-mail, telefone, CPF/CNPJ e CRO; o back-end valida CPF/CNPJ com dígitos verificadores, exige senha de no mínimo 8 caracteres (a mesma regra da tela) e garante e-mail (sem diferenciar maiúsculas) e CPF/CNPJ únicos
-2. **Login de dentista com JWT** — autenticação via e-mail e senha, retorna token JWT com validade de 8 horas, carregando `dentista_id`, `nome`, `email` e `tipo` no payload. A sessão fica salva no aparelho, mantendo o dentista logado ao reabrir o app.
-3. **Autorização por identidade no JWT** — as rotas do dentista exigem token do tipo `dentista` (um token de paciente recebe `403`); o dentista só visualiza, altera e cancela os próprios agendamentos e só lê, edita ou apaga o próprio perfil.
+1. **Cadastro de dentista:** criação de conta com dados pessoais e senha, com validação dos campos e prevenção de e-mail e CPF/CNPJ duplicados.
+2. **Login de dentista com JWT:** autenticação por e-mail e senha e emissão de token para acessar as rotas protegidas.
+3. **Visualização de perfil:** consulta dos dados do dentista autenticado.
+4. **Atualização de perfil:** alteração dos dados pessoais, com validações de segurança.
+5. **Exclusão de conta:** remoção da conta do dentista e dos agendamentos associados.
+6. **Login com Google:** autenticação por OAuth2, com verificação do token recebido.
+7. **Recuperação de senha por código OTP:** solicitação, validação do código temporário e redefinição da senha.
 
-### Gestão do Perfil do Dentista
+### Agenda e realocação de pacientes
 
-4. **Visualização de perfil** — dentista autenticado consulta seus dados.
-5. **Atualização de perfil** — edição de nome, e-mail e telefone, com revalidação de e-mail duplicado; trocar a senha pelo perfil exige a senha atual.
-6. **Logout** — encerra a sessão local, com confirmação.
-7. **Exclusão de conta** — apaga o dentista e os agendamentos dele.
+8. **Visualização da agenda diária:** apresentação dos agendamentos e horários vagos do dentista, organizados por data e horário.
+9. **Criação de agendamento:** registro de uma consulta com paciente, tipo de atendimento, data, horário, duração e valor. O Service também verifica a duração e impede sobreposição com outros horários da agenda.
+10. **Abertura de horário vago:** criação de um espaço disponível na agenda sem associar um paciente.
+11. **Cancelamento de consulta com liberação de horário:** alteração do status da consulta para cancelado e abertura de um horário vago no mesmo período.
+12. **Encaixe rápido de paciente:** associação de um paciente que chegou à clínica a um horário vago existente.
+13. **Confirmação de atendimento:** alteração do status do agendamento para concluído.
+14. **Alertas de horários vagos:** exibição dos próximos horários disponíveis para encaixe.
 
-### Gestão de Agenda e Realocação de Clientes
+### Gestão e acompanhamento
 
-8. **Agenda diária** — lista os agendamentos e os horários vagos do dentista logado, com faixa semanal para escolher o dia, indicação dos dias com consulta, linha do tempo ordenada por horário, contador de consultas e horários vagos e atualização por "puxar para atualizar".
-9. **Criação de agendamento ou horário vago** — formulário em 3 etapas (nome e telefone do cliente → tipo de consulta, valor e duração → data e hora) via `POST /agendamentos/`. Com "Abrir horário vago" o horário nasce sem paciente. O `dentista_id` vem do token, e o back-end recusa horários que se sobrepõem considerando a duração (14:00 com 30 min bloqueia 14:15).
-10. **Cancelamento que libera o horário** — ao cancelar uma consulta, o registro fica como `cancelado` (para o painel) e um horário vago é aberto no mesmo lugar, pronto para um encaixe.
-11. **Encaixe rápido de cliente em horário vago** — dentista informa nome e telefone de um cliente que chegou pessoalmente e o associa a um horário vago; o horário passa a contar como recuperado no painel.
-12. **Confirmação de atendimento** — o botão "Confirmar Atendimento" grava o status `concluido` na API; consultas concluídas não podem mais ser alteradas.
-13. **Alertas de horários vagos** — tela com os próximos horários vagos e o valor que ainda dá para recuperar, cada um com o botão de encaixe.
+15. **Cadastro de clínica:** registro de uma clínica com seus dados de identificação e endereço.
+16. **Catálogo de tipos de consulta:** consulta dos tipos de atendimento, incluindo descrição, valor e duração.
+17. **Painel de indicadores:** apresentação de horários recuperados, pacientes encaixados, taxa de ocupação, ociosidade, cancelamentos e prejuízo evitado.
 
-### Painel Administrativo
+### Integração com WhatsApp e IA
 
-14. **Indicadores de realocação** — `GET /painel/resumo` calcula prejuízo evitado (valor dos horários recuperados), ociosidade e taxa de ocupação (pelo tempo de agenda já passado), horários recuperados, pacientes encaixados, consultas realizadas e cancelamentos dos últimos 3 meses, e o gráfico de prejuízo evitado dos últimos 6 meses.
+18. **Agendamento pelo WhatsApp com IA:** o paciente envia uma solicitação; o fluxo do n8n utiliza IA para interpretar os dados e chama a API do ReOdonto para verificar disponibilidade e registrar o agendamento ou sugerir alternativas.
+19. **Cancelamento pelo WhatsApp:** recebimento de uma solicitação de cancelamento pela integração e encaminhamento à API para localizar e cancelar o agendamento correspondente.
+20. **Oferta automática de antecipação:** depois que um horário é liberado, o sistema seleciona um paciente com consulta futura e envia uma oferta pelo WhatsApp. A resposta do paciente é processada e, se ele aceitar, o agendamento é transferido para o horário disponível.
 
-#### Autenticação adicional
+## Arquitetura e responsabilidades
 
-15. **Login com Google (OAuth2)** — fluxo web (`/auth/google/login`, `/callback`, `/logout`) e verificação de `id_token`/`access_token` (`/auth/google/verify-token`); entra na conta de dentista com o mesmo e-mail ou cria uma. O `access_token` só é aceito se tiver sido emitido para o client ID do app.
-16. **Recuperação de senha com OTP** — `/dentistas/recuperar-senha` e `/dentistas/redefinir-senha`: código de 6 dígitos gerado com CSPRNG, armazenado apenas como hash SHA-256, expiração em 15 minutos, limite de 3 pedidos por hora por e-mail (`429` ao exceder) e envio por SMTP.
+O backend está organizado em camadas para separar o recebimento das requisições, as regras de negócio, o acesso aos dados e a representação das entidades.
 
-#### Agendamentos e Dentistas
+| Camada         | Diretório               | Responsabilidade no projeto                                                                                                                                                                   |
+| -------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Controller     | `backend/controllers/`  | Recebe requisições HTTP, interpreta parâmetros e JSON, aciona o Service correspondente e devolve respostas JSON com os códigos HTTP. Os módulos registram rotas por meio de Flask Blueprints. |
+| Service        | `backend/services/`     | Executa as regras de negócio e coordena os casos de uso, como validar conflitos, cancelar consultas, realizar encaixes, calcular indicadores e tratar solicitações vindas do WhatsApp.        |
+| Model          | `backend/models/`       | Representa as entidades persistidas. As entidades utilizam SQLAlchemy e herdam de `db.Model`.                                                                                                 |
+| Repository     | `backend/repositories/` | Concentra consultas de dados e filtros específicos usados pelos Services, como busca de horários vagos, agendamentos futuros e horários que se sobrepõem.                                     |
+| Banco de dados | `backend/database/`     | Configuração da conexão e arquivos relacionados ao SQLite.                                                                                                                                    |
 
-17. **Busca de agendamento por id** — restrita ao dentista dono do agendamento.
+**Observação sobre a implementação atual:** nos arquivos consultados do repositório, os handlers dos Controllers estão definidos como funções registradas em Flask Blueprints, e os Services também estão implementados como funções em módulos. A atividade solicita Controllers e Services implementados como classes. Além disso, o Repository atual contém alguns auxiliares de persistência simples (`adicionar`, `remover` e `confirmar`). Esses pontos precisam ser adequados no código para cumprir literalmente o padrão exigido; a documentação, por si só, não substitui essa alteração.
 
-#### Clínicas e Consultas
+### Integrações externas
 
-18. **CRUD de clínicas** — criação, listagem paginada (`page` / `per_page`), busca por id, atualização e exclusão; a escrita é restrita a dentistas.
-19. **Catálogo de tipos de consulta** — `/consultas` com nome, descrição, valor e duração; a escrita é restrita a dentistas.
-20. **Consulta de endereço por CEP** — `GET /cep/<cep>`, integração com a BrasilAPI para logradouro, bairro, cidade e estado (o app consulta a BrasilAPI diretamente).
+A integração de WhatsApp está separada da interface Flutter:
 
-#### Integração por WhatsApp
+- `backend/controllers/integracao_controller.py` disponibiliza os endpoints de integração e valida a chave recebida no cabeçalho `X-API-Key`.
+- `backend/services/whatsapp_service.py` trata solicitações de agendamento, cancelamento e respostas às ofertas.
+- `backend/services/adiantamento_service.py` seleciona pacientes elegíveis, registra as ofertas e trata respostas, recusas e expiração.
+- `backend/services/ponte_whatsapp.py` encapsula o envio de mensagens à ponte de WhatsApp.
+- `n8n/` contém o fluxo que recebe a mensagem, utiliza IA para interpretar o pedido e chama a API do ReOdonto. A chamada ao provedor de IA é orquestrada nesse workflow; o backend recebe os dados interpretados e aplica as regras de agendamento.
 
-21. **Agendamento automático por WhatsApp (n8n + IA)** — o paciente pede a consulta por mensagem; o n8n interpreta o pedido com IA e chama `POST /integracoes/whatsapp/agendar` (protegida por chave de API). A API confirma o horário, encaixa o paciente em um horário vago aberto por cancelamento ou devolve alternativas quando há conflito, sempre com uma resposta pronta para o WhatsApp. Detalhes e workflow em [`n8n/README.md`](n8n/README.md).
-22. **Aviso automático para adiantar consultas** — quando uma consulta é cancelada, o horário vago é oferecido por WhatsApp ao próximo paciente agendado (até 7 dias depois, com telefone cadastrado e que não seja quem cancelou). Se ele responder SIM, a consulta é movida para o horário vago e o horário antigo vira vago, repetindo o aviso até 2 rodadas. Se responder NÃO ou a oferta expirar (30 minutos), ela segue para o próximo. As ofertas ficam na tabela `oferta_adiantamento`.
-
----
-
-## Como rodar o back-end
-
-```bash
-cd ReOdonto/backend
-pip install -r requirements.txt
-cp ../.env.example .env      # preencha SECRET_KEY, JWT_SECRET_KEY e ENCRYPTION_KEY
-python app.py
-```
-
-Para já começar com uma conta de dentista de teste (`teste@reodonto.com`, senha `Teste12345`) e a clínica inicial, rode `python seed.py` uma vez antes de subir o back-end. É uma conta só de demonstração.
-
-Sem as chaves no `.env` o back-end sobe mesmo assim, mas gera chaves aleatórias a cada execução (os logins caem quando ele reinicia). Nenhuma chave ou credencial fica no código: `.env`, `client_secret.json` e o banco `odonto.db` estão no `.gitignore`. Bancos criados antes desta versão recebem as colunas novas automaticamente ao subir.
-
-Para conferir os fluxos principais (agenda, cancelamento, encaixe, painel, autorização, recuperação de senha e login Google) contra um banco temporário:
-
-```bash
-cd ReOdonto/backend
-python tests/smoke_test.py
-```
+As chaves e credenciais devem ser configuradas por variáveis de ambiente no `.env`. O arquivo `.env.example` serve como modelo. Não publique tokens, senhas ou chaves reais no repositório.
 
 ---
 
-## Diagrama de Classes
+
+
+## Estrutura do repositório
+
+```text
+ReOdonto/
+├── frontend/
+│   └── lib/
+│       ├── main.dart
+│       ├── pages/          # Telas do aplicativo
+│       ├── widgets/        # Componentes reutilizáveis
+│       ├── services/       # Comunicação HTTP e sessão
+│       ├── models/         # Modelos usados no frontend
+│       ├── utils/          # Máscaras, validadores e formatadores
+│       └── theme/          # Cores e tema visual
+├── backend/
+│   ├── app.py              # Inicialização da API Flask
+│   ├── controllers/        # Rotas e Blueprints
+│   ├── services/           # Regras dos casos de uso
+│   ├── models/             # Entidades SQLAlchemy
+│   ├── repositories/       # Consultas e acesso a dados
+│   ├── database/           # Configuração e banco SQLite
+│   ├── tests/              # Testes automatizados
+│   ├── requirements.txt
+│   └── seed.py              # Dados iniciais para desenvolvimento
+├── n8n/                    # Workflow de integração com WhatsApp e IA
+├── .env.example            # Modelo das variáveis de ambiente
+└── README.md
+```
+
+---
+
+## Diagrama de classes
+
+O diagrama abaixo representa as Models do domínio consultadas no backend e seus principais atributos. Ele está incluído neste README, no caminho `README.md` → seção **Diagrama de classes**.
 
 ```mermaid
 classDiagram
@@ -96,7 +137,6 @@ classDiagram
         +String telefone
         +String cro
         +String cpf_cnpj
-        +to_dict() dict
     }
 
     class Clinica {
@@ -110,7 +150,6 @@ classDiagram
         +String numero
         +String cidade
         +String estado
-        +to_dict() dict
     }
 
     class Agendamento {
@@ -125,18 +164,22 @@ classDiagram
         +float valor
         +bool encaixe
         +String status
-        +vago() bool
-        +to_dict() dict
-        +to_dict_completo() dict
+        +bool vago
     }
 
     class Paciente {
         +int id
         +String nome
         +String email
+        +String email_hash
+        +String senha
         +String telefone
         +String cpf
-        +to_dict() dict
+        +String cpf_hash
+        +String cep
+        +String rua
+        +String bairro
+        +String numero
     }
 
     class Consulta {
@@ -145,85 +188,76 @@ classDiagram
         +String descricao
         +float valor
         +int duracao_minutos
-        +to_dict() dict
     }
 
-    class RecuperacaoSenha {
+
+    class OfertaAdiantamento {
         +int id
-        +String email_hash
-        +String codigo_hash
+        +int dentista_id
+        +int vago_id
+        +int agendamento_id
+        +String telefone
+        +int rodada
+        +String status
+        +DateTime criado_em
         +DateTime expira_em
-        +bool usado
-        +esta_valido() bool
     }
 
     Dentista "1" --> "0..*" Agendamento : possui
-    Clinica "0..1" --> "0..*" Agendamento : sedia
-```
-
-`Paciente` guarda os dados criptografados e `Consulta` é o catálogo de tipos de consulta. `RecuperacaoSenha` guarda o código OTP (somente o hash) usado para redefinir a senha de dentista ou paciente.
-
-`status` pode ser `agendado`, `concluido` ou `cancelado`. Um agendamento sem `nome_paciente` representa um horário vago. O diagrama é renderizado diretamente no GitHub e GitLab via [Mermaid](mermaid.js.org).
-
----
-
-## Arquitetura em camadas
-
-O back-end separa as responsabilidades em quatro camadas. A requisição desce até o banco e a resposta volta pelo mesmo caminho:
-
-```
-Controller  →  Service  →  Repository  →  Model (SQLAlchemy)  →  SQLite
- (HTTP)      (regras)     (consultas)       (entidades)
-```
-
-1. **Controller** (`controllers/`) recebe a requisição HTTP, valida o token e devolve o JSON.
-2. **Service** (`services/`) aplica as regras do caso de uso, como conflito de horário e validação de CPF.
-3. **Repository** (`repositories/`) concentra toda consulta e gravação no banco; nenhuma outra camada fala direto com o SQLAlchemy.
-4. **Model** (`models/`) representa as tabelas.
-
-Exemplo, cancelar uma consulta (`PATCH /agendamentos/<id>/status`): o controller confere se o agendamento é do dentista logado; o service muda o status e decide abrir um horário vago; o repository busca o agendamento, grava o vago e confirma a transação.
-
-O app Flutter e a API são independentes: o front só consome a API por requisições HTTP.
-
----
-
-## Estrutura do repositório
-
-```
-ReOdonto/
-├── frontend/                     ← interface Flutter
-│   ├── assets/icons/
-│   ├── web/ android/ ios/ ...    ← plataformas suportadas
-│   └── lib/
-│   ├── main.dart             ← rotas e tema do app
-│   ├── pages/                ← telas (login, cadastro, agenda, perfil, menu)
-│   ├── widgets/              ← componentes (agenda, cadastro, perfil, painel)
-│   ├── services/             ← api_service, sessao_usuario
-│   ├── models/               ← agendamento, resumo_painel
-│   ├── utils/                ← máscaras, validadores, formatadores
-│   └── theme/                ← paleta de cores
-├── backend/
-│   ├── app.py                    ← aplicação Flask e registro dos Blueprints
-│   ├── seed.py                   ← cria a clínica inicial
-│   ├── requirements.txt
-│   ├── controllers/              ← rotas HTTP (Blueprints Flask)
-│   ├── models/                   ← entidades SQLAlchemy
-│   ├── services/                 ← regras de negócio
-│   ├── repositories/             ← consultas e gravações no banco
-│   ├── utils/                    ← criptografia e autorização (auth.py)
-│   ├── tests/                    ← teste de fumaça dos fluxos principais
-│   └── database/
-│       ├── db.py
-│       └── create_database.sql
-├── n8n/                          ← workflow de agendamento por WhatsApp
-└── .env.example
+    Clinica "0..1" --> "0..*" Agendamento : associada
+    Dentista "1" --> "0..*" OfertaAdiantamento : registra
 ```
 
 ---
 
-## Nome dos participantes
+## Como executar o projeto
 
-- Eduardo Aquino
-- Lucas Caldas
-- Arthur Augusto
-- Yslan Cirilo
+### Backend — Flask
+
+Pré-requisitos: Python instalado.
+
+```bash
+cd ReOdonto/backend
+pip install -r requirements.txt
+```
+
+Crie o arquivo `.env` a partir do modelo e preencha as chaves necessárias:
+
+```bash
+cp ../.env.example .env
+```
+
+No Windows, o arquivo também pode ser copiado manualmente. Configure as variáveis de ambiente exigidas pelo ambiente, como `SECRET_KEY`, `JWT_SECRET_KEY`, `ENCRYPTION_KEY` e, para integrações, as respectivas chaves e URLs. Em seguida, inicie a API:
+
+```bash
+python app.py
+```
+
+A API local utiliza a porta `5000`.
+
+Para popular o banco com dados iniciais de desenvolvimento, execute uma vez:
+
+```bash
+python seed.py
+```
+
+### Frontend — Flutter
+
+Pré-requisitos: Flutter SDK configurado e um dispositivo ou navegador disponível.
+
+```bash
+cd ReOdonto/frontend
+flutter pub get
+flutter run -d chrome
+```
+
+Para executar em um emulador Android, mantenha a API ativa e confira o endereço-base configurado em `frontend/lib/services/api_service.dart` (`10.0.2.2:5000` para o emulador Android).
+
+## Testes
+
+O backend possui um teste de verificação dos fluxos principais em banco temporário. Para executá-lo:
+
+```bash
+cd ReOdonto/backend
+python tests/smoke_test.py
+```

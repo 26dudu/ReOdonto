@@ -40,29 +40,28 @@ A lista abaixo reúne os fluxos e operações disponíveis no projeto. Para a av
 5. **Logout:** remoção da conta do dentista e dos agendamentos associados.
 6. **Login com Google:** autenticação por OAuth2, com verificação do token recebido.
 7. **Recuperação de senha por código OTP:** solicitação, validação do código temporário e redefinição da senha.
-8. **Verificação de e-mail no cadastro:** o cadastro tem duas etapas. `POST /dentistas/` valida os dados e envia um código de 6 dígitos por e-mail, mas não cria a conta; só `POST /dentistas/verificar-email`, com o código correto, cria o dentista. O código expira em 15 minutos, é invalidado após 5 erros e aceita no máximo 3 pedidos por hora por e-mail. `POST /dentistas/reenviar-verificacao` envia um novo código. Contas criadas pelo Google já são consideradas verificadas.
 
 ### Agenda e realocação de pacientes
 
-9. **Visualização da agenda diária:** apresentação dos agendamentos e horários vagos do dentista, organizados por data e horário.
-10. **Criação de agendamento:** registro de uma consulta com paciente, tipo de atendimento, data, horário, duração e valor. O Service também verifica a duração e impede sobreposição com outros horários da agenda.
-11. **Abertura de horário vago:** criação de um espaço disponível na agenda sem associar um paciente.
-12. **Cancelamento de consulta com liberação de horário:** alteração do status da consulta para cancelado e abertura de um horário vago no mesmo período.
-13. **Encaixe rápido de paciente:** associação de um paciente que chegou à clínica a um horário vago existente.
-14. **Confirmação de atendimento:** alteração do status do agendamento para concluído.
-15. **Alertas de horários vagos:** exibição dos próximos horários disponíveis para encaixe.
+8. **Visualização da agenda diária:** apresentação dos agendamentos e horários vagos do dentista, organizados por data e horário.
+9. **Criação de agendamento:** registro de uma consulta com paciente, tipo de atendimento, data, horário, duração e valor. O Service também verifica a duração e impede sobreposição com outros horários da agenda.
+10. **Abertura de horário vago:** criação de um espaço disponível na agenda sem associar um paciente.
+11. **Cancelamento de consulta com liberação de horário:** alteração do status da consulta para cancelado e abertura de um horário vago no mesmo período.
+12. **Encaixe rápido de paciente:** associação de um paciente que chegou à clínica a um horário vago existente.
+13. **Confirmação de atendimento:** alteração do status do agendamento para concluído.
+14. **Alertas de horários vagos:** exibição dos próximos horários disponíveis para encaixe.
 
 ### Gestão e acompanhamento
 
-16. **Cadastro de clínica:** registro de uma clínica com seus dados de identificação e endereço.
-17. **Catálogo de tipos de consulta:** consulta dos tipos de atendimento, incluindo descrição, valor e duração.
-18. **Painel de indicadores:** apresentação de horários recuperados, pacientes encaixados, taxa de ocupação, ociosidade, cancelamentos e prejuízo evitado.
+15. **Cadastro de clínica:** registro de uma clínica com seus dados de identificação e endereço.
+16. **Catálogo de tipos de consulta:** consulta dos tipos de atendimento, incluindo descrição, valor e duração.
+17. **Painel de indicadores:** apresentação de horários recuperados, pacientes encaixados, taxa de ocupação, ociosidade, cancelamentos e prejuízo evitado.
 
 ### Integração com WhatsApp e IA
 
-19. **Agendamento pelo WhatsApp com IA:** o paciente envia uma solicitação; o fluxo do n8n utiliza IA para interpretar os dados e chama a API do ReOdonto para verificar disponibilidade e registrar o agendamento ou sugerir alternativas.
-20. **Cancelamento pelo WhatsApp:** recebimento de uma solicitação de cancelamento pela integração e encaminhamento à API para localizar e cancelar o agendamento correspondente.
-21. **Oferta automática de antecipação:** depois que um horário é liberado, o sistema seleciona um paciente com consulta futura e envia uma oferta pelo WhatsApp. A resposta do paciente é processada e, se ele aceitar, o agendamento é transferido para o horário disponível.
+18. **Agendamento pelo WhatsApp com IA:** o paciente envia uma solicitação; o fluxo do n8n utiliza IA para interpretar os dados e chama a API do ReOdonto para verificar disponibilidade e registrar o agendamento ou sugerir alternativas.
+19. **Cancelamento pelo WhatsApp:** recebimento de uma solicitação de cancelamento pela integração e encaminhamento à API para localizar e cancelar o agendamento correspondente.
+20. **Oferta automática de antecipação:** depois que um horário é liberado, o sistema seleciona um paciente com consulta futura e envia uma oferta pelo WhatsApp. A resposta do paciente é processada e, se ele aceitar, o agendamento é transferido para o horário disponível.
 
 ## Arquitetura e responsabilidades
 

@@ -12,6 +12,7 @@ class Dentista(db.Model):
     cro = db.Column(db.String(20), nullable=True)
     # CPF (11 dígitos) ou CNPJ (14 dígitos) — somente números, único
     cpf_cnpj = db.Column(db.String(14), nullable=True, unique=True)
+    email_verificado = db.Column(db.Boolean, nullable=False, default=False)
 
     def to_dict(self):
         return {
@@ -21,4 +22,5 @@ class Dentista(db.Model):
             'telefone': self.telefone,
             'cro': self.cro,
             'cpf_cnpj': self.cpf_cnpj,
+            'email_verificado': self.email_verificado,
         }

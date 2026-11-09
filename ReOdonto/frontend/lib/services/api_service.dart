@@ -43,6 +43,8 @@ class ApiResultado<T> {
 class ApiService {
   // ----------------------------------------------------------------
   // CADASTRO DENTISTA — POST /dentistas/
+  // Primeira etapa: valida os dados e envia o código por email (202).
+  // A conta só é criada em verificarEmail, quando o código é digitado.
   // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> cadastrar({
     required String nome,
@@ -75,7 +77,7 @@ class ApiService {
           .timeout(const Duration(seconds: 10));
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      if (response.statusCode == 201) return ApiResultado.sucesso(body);
+      if (response.statusCode == 202) return ApiResultado.sucesso(body);
       return ApiResultado.falha(body['erro'] ?? 'Erro ao criar conta');
     } on SocketException {
       return const ApiResultado.falha(
@@ -107,6 +109,61 @@ class ApiService {
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (response.statusCode == 200) return ApiResultado.sucesso(body);
       return ApiResultado.falha(body['erro'] ?? 'Email ou senha inválidos');
+    } on SocketException {
+      return const ApiResultado.falha(
+          'Sem conexão com o servidor. Verifique se o backend está rodando.');
+    } on http.ClientException {
+      return const ApiResultado.falha('Erro de conexão. Tente novamente.');
+    } catch (e) {
+      return ApiResultado.falha('Erro inesperado: $e');
+    }
+  }
+
+  // ----------------------------------------------------------------
+  // VERIFICAR EMAIL — POST /dentistas/verificar-email
+  // Segunda etapa do cadastro: com o código de 6 dígitos, cria a conta.
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> verificarEmail({
+    required String email,
+    required String codigo,
+  }) =>
+      _postPublico(
+        '/dentistas/verificar-email',
+        {'email': email, 'codigo': codigo},
+        erroPadrao: 'Código inválido ou expirado',
+      );
+
+  // ----------------------------------------------------------------
+  // REENVIAR VERIFICAÇÃO — POST /dentistas/reenviar-verificacao
+  // ----------------------------------------------------------------
+  static Future<ApiResultado<Map<String, dynamic>>> reenviarVerificacaoEmail({
+    required String email,
+  }) =>
+      _postPublico(
+        '/dentistas/reenviar-verificacao',
+        {'email': email},
+        erroPadrao: 'Erro ao reenviar o código',
+      );
+
+  static Future<ApiResultado<Map<String, dynamic>>> _postPublico(
+    String caminho,
+    Map<String, dynamic> corpo, {
+    required String erroPadrao,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$_baseUrl$caminho'),
+            headers: _headersPublicos,
+            body: jsonEncode(corpo),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return ApiResultado.sucesso(body);
+      }
+      return ApiResultado.falha(body['erro'] ?? erroPadrao);
     } on SocketException {
       return const ApiResultado.falha(
           'Sem conexão com o servidor. Verifique se o backend está rodando.');

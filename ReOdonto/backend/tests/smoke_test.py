@@ -37,6 +37,16 @@ email_service.enviar_codigo = lambda destino, codigo: codigos.__setitem__(destin
 import services.recuperacao_service as rec  # noqa: E402
 rec.email_service = email_service
 
+codigos_verificacao = {}
+email_service.enviar_codigo_verificacao = (
+    lambda destino, codigo: codigos_verificacao.__setitem__(destino, codigo)
+)
+import services.verificacao_email_service as ver  # noqa: E402
+ver.email_service = email_service
+from database.db import db  # noqa: E402
+from models.dentista_model import Dentista  # noqa: E402
+from repositories import dentista_repository  # noqa: E402
+
 falhas = []
 
 
@@ -51,23 +61,89 @@ def auth(token):
     return {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
 
 
+def verificar_email(email):
+    codigo = next(c for d, c in codigos_verificacao.items() if d.lower() == email.lower())
+    return cliente.post('/dentistas/verificar-email', json={'email': email, 'codigo': codigo})
+
+
 ontem = (datetime.now() - timedelta(days=1)).replace(microsecond=0)
 as_14 = ontem.replace(hour=14, minute=0, second=0).isoformat()
 as_1415 = ontem.replace(hour=14, minute=15, second=0).isoformat()
 as_16 = ontem.replace(hour=16, minute=0, second=0).isoformat()
 
-print('\n--- Cadastro e login ---')
+print('\n--- Cadastro com verificação de email ---')
 r = cliente.post('/dentistas/', json={
     'nome': 'Dra. Ana', 'email': 'Ana@Clinica.com', 'senha': 'SenhaForte1',
     'telefone': '31988887777', 'cro': 'MG-12345', 'cpf_cnpj': '52998224725',
 })
-checar('cadastro de dentista aceito', r.status_code == 201, r.get_data(as_text=True))
-dentista_id = r.get_json()['id']
+checar('cadastro só pede o código (202)', r.status_code == 202, r.get_data(as_text=True))
+checar('cadastro gera código de verificação',
+       len(codigos_verificacao.get('Ana@Clinica.com', '')) == 6, str(codigos_verificacao))
+
+with app.app_context():
+    checar('a conta NÃO existe antes de digitar o código',
+           dentista_repository.buscar_por_email('ana@clinica.com') is None)
+
+r = cliente.post('/dentistas/login', json={'email': 'ana@clinica.com', 'senha': 'SenhaForte1'})
+checar('não entra antes de verificar o email', r.status_code == 401, r.get_data(as_text=True))
 
 r = cliente.post('/dentistas/', json={
     'nome': 'Curto', 'email': 'curto@x.com', 'senha': 'abc123',
 })
 checar('senha com menos de 8 caracteres recusada', r.status_code == 400,
+       r.get_data(as_text=True))
+checar('dados inválidos não geram código', 'curto@x.com' not in codigos_verificacao)
+
+r = cliente.post('/dentistas/verificar-email', json={'email': 'ana@clinica.com', 'codigo': '000000'})
+checar('código de verificação errado recusado', r.status_code == 400, r.get_data(as_text=True))
+r = cliente.post('/dentistas/verificar-email', json={'email': 'ana@clinica.com'})
+checar('verificação sem código recusada', r.status_code == 400, r.get_data(as_text=True))
+
+codigo_antigo = codigos_verificacao['Ana@Clinica.com']
+r = cliente.post('/dentistas/reenviar-verificacao', json={'email': 'ana@clinica.com'})
+checar('reenvio de verificação aceito', r.status_code == 200, r.get_data(as_text=True))
+if codigos_verificacao['Ana@Clinica.com'] == codigo_antigo:
+    codigo_antigo = '000001'
+r = cliente.post('/dentistas/verificar-email', json={'email': 'ana@clinica.com', 'codigo': codigo_antigo})
+checar('código anterior invalidado pelo reenvio', r.status_code == 400, r.get_data(as_text=True))
+
+r = verificar_email('ana@clinica.com')
+checar('código certo cria a conta (201)', r.status_code == 201
+       and r.get_json()['dentista']['email_verificado'] is True, r.get_data(as_text=True))
+dentista_id = r.get_json()['dentista']['id']
+r = verificar_email('ana@clinica.com')
+checar('o código não pode ser usado de novo', r.status_code == 400, r.get_data(as_text=True))
+
+r = cliente.post('/dentistas/', json={'nome': 'Outra Ana', 'email': 'ana@clinica.com', 'senha': 'SenhaForte1'})
+checar('email já cadastrado recusado antes de pedir código', r.status_code == 400,
+       r.get_data(as_text=True))
+
+cliente.post('/dentistas/', json={'nome': 'Forçado', 'email': 'forcado@x.com', 'senha': 'SenhaForte1'})
+for _ in range(ver.MAX_TENTATIVAS_ERRADAS):
+    cliente.post('/dentistas/verificar-email', json={'email': 'forcado@x.com', 'codigo': '000000'})
+r = verificar_email('forcado@x.com')
+checar('código é invalidado após erros repetidos', r.status_code == 400, r.get_data(as_text=True))
+r = cliente.post('/dentistas/reenviar-verificacao', json={'email': 'forcado@x.com'})
+r = verificar_email('forcado@x.com')
+checar('depois de invalidado, um reenvio traz código que funciona', r.status_code == 201,
+       r.get_data(as_text=True))
+
+cliente.post('/dentistas/', json={'nome': 'Limite', 'email': 'limite@x.com', 'senha': 'SenhaForte1'})
+for _ in range(ver.MAX_PEDIDOS_POR_HORA):
+    r = cliente.post('/dentistas/reenviar-verificacao', json={'email': 'limite@x.com'})
+checar('limite de pedidos por hora devolve 429', r.status_code == 429, r.get_data(as_text=True))
+r = cliente.post('/dentistas/', json={'nome': 'Limite', 'email': 'limite@x.com', 'senha': 'SenhaForte1'})
+checar('o limite vale também para o cadastro', r.status_code == 429, r.get_data(as_text=True))
+r = cliente.post('/dentistas/reenviar-verificacao', json={'email': 'ninguem@x.com'})
+checar('reenvio sem cadastro pendente não revela nada', r.status_code == 200,
+       r.get_data(as_text=True))
+
+with app.app_context():
+    orfao = Dentista(nome='Orfão', email='orfao@x.com', senha='x', email_verificado=False)
+    db.session.add(orfao)
+    db.session.commit()
+r = cliente.post('/dentistas/', json={'nome': 'Orfão', 'email': 'orfao@x.com', 'senha': 'SenhaForte1'})
+checar('conta antiga sem email confirmado pode se cadastrar de novo', r.status_code == 202,
        r.get_data(as_text=True))
 
 # Login com outra caixa de maiúsculas que o cadastro.
@@ -175,7 +251,7 @@ print('\n--- Autorização: dentista não mexe em outro dentista ---')
 r = cliente.post('/dentistas/', json={
     'nome': 'Dr. Bruno', 'email': 'bruno@clinica.com', 'senha': 'SenhaForte2',
 })
-outro_dentista_id = r.get_json()['id']
+outro_dentista_id = verificar_email('bruno@clinica.com').get_json()['dentista']['id']
 r = cliente.post('/dentistas/login', json={'email': 'bruno@clinica.com', 'senha': 'SenhaForte2'})
 token_bruno = r.get_json()['token']
 
@@ -286,6 +362,8 @@ checar('access token do app aceito', r.status_code == 200, r.get_data(as_text=Tr
 corpo = r.get_json() or {}
 checar('Google devolve conta de DENTISTA', 'dentista' in corpo and 'paciente' not in corpo,
        str(corpo))
+checar('conta criada pelo Google já nasce com email verificado',
+       corpo.get('dentista', {}).get('email_verificado') is True, str(corpo))
 r = cliente.get('/agendamentos/', headers=auth(corpo.get('token', '')))
 checar('dentista do Google acessa a agenda', r.status_code == 200, r.get_data(as_text=True))
 r = cliente.post('/auth/google/verify-token', json={'access_token': 'token-valido'})
@@ -303,7 +381,7 @@ r = cliente.post('/dentistas/', json={
     'nome': 'Dr. Zé', 'email': 'ze@clinica.com', 'senha': 'SenhaForte1',
     'telefone': '31977776666', 'cro': 'MG-777', 'cpf_cnpj': '11144477735',
 })
-ze_id = r.get_json()['id']
+ze_id = verificar_email('ze@clinica.com').get_json()['dentista']['id']
 r = cliente.post('/dentistas/login', json={'email': 'ze@clinica.com', 'senha': 'SenhaForte1'})
 ze_token = r.get_json()['token']
 

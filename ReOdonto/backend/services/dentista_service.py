@@ -2,10 +2,17 @@ import re
 import bcrypt
 from models.dentista_model import Dentista
 from repositories import agendamento_repository, dentista_repository as repo
+from services import verificacao_email_service
 
 # Mesmo mínimo que o app já exige em validadores.dart — antes o backend
 # aceitava 6, deixando a regra mais fraca que a da tela de cadastro.
 MIN_CARACTERES_SENHA = 8
+
+
+class EmailNaoVerificado(ValueError):
+    def __init__(self, email: str):
+        super().__init__('Cadastro não concluído. Cadastre-se de novo para confirmar seu email.')
+        self.email = email
 
 
 def _hash_senha(senha: str) -> str:
@@ -47,7 +54,7 @@ def _validar_cnpj(cnpj: str) -> bool:
     return True
 
 
-def criar_dentista(data):
+def _validar_cadastro(data) -> dict:
     campos_obrigatorios = ['nome', 'email', 'senha']
     for campo in campos_obrigatorios:
         if not data.get(campo):
@@ -82,23 +89,85 @@ def criar_dentista(data):
         if repo.buscar_por_cpf_cnpj(cpf_cnpj):
             raise ValueError('CPF/CNPJ já cadastrado')
 
+    return {
+        'nome': data['nome'],
+        'email': email,
+        'senha_hash': _hash_senha(data['senha']),
+        'telefone': data.get('telefone'),
+        'cro': data.get('cro'),
+        'cpf_cnpj': cpf_cnpj,
+    }
+
+
+def _gravar_dentista(dados: dict, email_verificado: bool) -> Dentista:
     dentista = Dentista(
-        nome=data['nome'],
-        email=email,
-        senha=_hash_senha(data['senha']),
-        telefone=data.get('telefone'),
-        cro=data.get('cro'),
-        cpf_cnpj=cpf_cnpj,
+        nome=dados['nome'],
+        email=dados['email'],
+        senha=dados['senha_hash'],
+        telefone=dados.get('telefone'),
+        cro=dados.get('cro'),
+        cpf_cnpj=dados.get('cpf_cnpj'),
+        email_verificado=email_verificado,
     )
     repo.adicionar(dentista)
     repo.confirmar()
     return dentista
 
 
+def _remover_cadastro_nao_verificado(email: str) -> None:
+    """
+    Apaga uma conta que ficou sem email confirmado (criada antes de o código
+    ser exigido antes do cadastro), liberando o email para um novo cadastro.
+    """
+    existente = repo.buscar_por_email(email)
+    if existente and not existente.email_verificado:
+        repo.remover(existente)
+        repo.confirmar()
+
+
+def solicitar_cadastro(data) -> str:
+    """
+    Primeira etapa do cadastro: valida os dados e envia o código por email.
+
+    Nenhuma conta é criada aqui. Ela só nasce em confirmar_cadastro, quando o
+    código é digitado. Devolve ENVIADO ou LIMITE_EXCEDIDO.
+    """
+    _remover_cadastro_nao_verificado((data.get('email') or '').strip())
+    dados = _validar_cadastro(data)
+    return verificacao_email_service.registrar_pedido(dados)
+
+
+def confirmar_cadastro(email: str, codigo: str) -> Dentista:
+    """Segunda etapa: com o código certo, cria a conta já verificada."""
+    dados = verificacao_email_service.validar_codigo(email, codigo)
+
+    if repo.buscar_por_email(dados['email']):
+        raise ValueError('Email já cadastrado')
+    if dados.get('cpf_cnpj') and repo.buscar_por_cpf_cnpj(dados['cpf_cnpj']):
+        raise ValueError('CPF/CNPJ já cadastrado')
+
+    dentista = _gravar_dentista(dados, email_verificado=True)
+    verificacao_email_service.descartar(dados['email'])
+    return dentista
+
+
+def criar_dentista(data, email_verificado: bool = True) -> Dentista:
+    """Cria a conta direto, sem código. Uso interno (seed e login Google)."""
+    return _gravar_dentista(_validar_cadastro(data), email_verificado)
+
+
+def marcar_email_verificado(dentista: Dentista) -> None:
+    if not dentista.email_verificado:
+        dentista.email_verificado = True
+        repo.confirmar()
+
+
 def login_dentista(email: str, senha: str) -> Dentista:
     dentista = repo.buscar_por_email(email)
     if not dentista or not _verificar_senha(senha, dentista.senha):
         raise ValueError('Email ou senha inválidos')
+    if not dentista.email_verificado:
+        raise EmailNaoVerificado(dentista.email)
     return dentista
 
 

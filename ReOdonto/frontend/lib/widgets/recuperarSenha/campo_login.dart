@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart'; // widgets básicos do Flutter (TextField, InputDecoration, etc)
+import 'package:flutter/services.dart'; // TextInputFormatter
 
 // =============================================================================
 // Campo de Login
@@ -61,6 +62,9 @@ class CampoLogin extends StatelessWidget {
   // à esquerda), seguindo o visual do Figma daquelas telas.
   final Widget? prefixIcon;
 
+  // Formatadores opcionais do texto digitado (ex: só dígitos, tamanho máximo).
+  final List<TextInputFormatter>? formatadores;
+
   // Construtor: define quais parâmetros são obrigatórios (`required`) e
   // quais têm valor padrão. `super.key` repassa a chave pro widget pai,
   // como em qualquer widget do Flutter.
@@ -74,6 +78,7 @@ class CampoLogin extends StatelessWidget {
     this.onChanged,
     this.suffixIcon,
     this.prefixIcon,
+    this.formatadores,
   });
 
   // Método build: monta o TextField de verdade, usando os parâmetros
@@ -90,6 +95,7 @@ class CampoLogin extends StatelessWidget {
       enabled: enabled,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      inputFormatters: formatadores,
 
       // Se `onChanged` foi passado pelo widget pai, o TextField vai
       // chamá-lo a cada mudança de texto. Se não foi passado (é `null`),

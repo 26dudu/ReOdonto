@@ -30,6 +30,7 @@ classDiagram
         +String(20) telefone
         +String(20) cro
         +String(14) cpf_cnpj
+        +Boolean email_verificado
         +to_dict() dict
     }
 
@@ -84,14 +85,31 @@ classDiagram
         +esta_valido() bool
     }
 
+    class VerificacaoEmail {
+        +int id
+        +String(64) email_hash
+        +String(64) codigo_hash
+        +Text dados_cadastro
+        +DateTime expira_em
+        +int tentativas
+        +Boolean usado
+        +DateTime criado_em
+        +esta_expirado() bool
+        +esta_valido() bool
+    }
+
     %% Relacionamentos
     Agendamento "N" --> "1" Dentista : dentista_id
     Agendamento "N" --> "0..1" Clinica : clinica_id
     RecuperacaoSenha "N" ..> "1" Paciente : email_hash (lógico)
+    VerificacaoEmail "N" ..> "1" Dentista : email_hash (lógico)
 
     %% Notas de segurança
     note for Paciente "Campos PII criptografados com\nFernet (AES-128-CBC).\nEmail e CPF indexados via SHA-256."
     note for RecuperacaoSenha "OTP de 6 dígitos gerado com\nsecrets.randbelow (CSPRNG).\nExpira em 15 minutos."
+    note for VerificacaoEmail "OTP de 6 dígitos (CSPRNG).
+Expira em 15 minutos e é
+invalidado após 5 erros."
 ```
 
 ---
@@ -106,12 +124,14 @@ classDiagram
 | `Consulta` | `consulta` | Catálogo de tipos de procedimento com duração e valor. |
 | `Agendamento` | `agendamento` | Slot de atendimento vinculado a dentista e clínica. Suporta pacientes walk-in. |
 | `RecuperacaoSenha` | `recuperacao_senha` | Token OTP temporário para redefinição de senha via email. |
+| `VerificacaoEmail` | `verificacao_email` | Código OTP e dados do cadastro pendente; a conta só é criada quando o email é confirmado. |
 
 ## Relacionamentos
 
 - **Agendamento → Dentista**: cada agendamento pertence a exatamente um dentista (`dentista_id FK`).
 - **Agendamento → Clinica**: cada agendamento pode estar associado a uma clínica (`clinica_id FK`, opcional).
 - **RecuperacaoSenha → Paciente**: associação lógica via `email_hash` (SHA-256), sem FK explícita no banco, para proteger a privacidade.
+- **VerificacaoEmail → Dentista**: associação lógica via `email_hash` (SHA-256). O registro some quando o código é confirmado e o Dentista é criado.
 
 ## Segurança dos Dados
 

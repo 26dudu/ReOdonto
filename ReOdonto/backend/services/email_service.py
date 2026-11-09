@@ -1,10 +1,14 @@
 """
-Serviço de envio e verificação de email para recuperação de senha.
+Serviço de envio de email com código OTP (recuperação de senha e verificação de email).
 
 Responsabilidades:
   1. verificar_caixa_de_entrada() — usa imaplib para confirmar que
      a caixa de entrada está acessível no servidor (conexão rápida).
-  2. enviar_codigo(destinatario, codigo) — envia o OTP via SMTP/STARTTLS.
+  2. enviar_codigo(destinatario, codigo) — OTP de recuperação de senha.
+  3. enviar_codigo_verificacao(destinatario, codigo) — OTP de verificação de email.
+
+Os dois envios compartilham o mesmo caminho (_enviar_otp): só o assunto e o
+texto mudam.
 
 Variáveis de ambiente necessárias:
   MAIL_SERVER   - ex: smtp.gmail.com
@@ -125,11 +129,48 @@ def verificar_caixa_de_entrada() -> None:
 # 2. Envio do OTP via SMTP
 # ---------------------------------------------------------------------------
 
-def enviar_codigo(destinatario: str, codigo: str) -> None:
-    """
-    Envia email com código OTP de recuperação de senha.
+VALIDADE_TEXTO = '15 minutos'
 
-    Fluxo de segurança:
+
+def _modo_teste() -> bool:
+    return (
+        os.environ.get('FLASK_TESTING', '').lower() == 'true'
+        or os.environ.get('TESTING', '').lower() == 'true'
+    )
+
+
+def _montar_mensagem(cfg: dict, destinatario: str, assunto: str,
+                     titulo: str, introducao: str, codigo: str,
+                     aviso: str) -> MIMEMultipart:
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = assunto
+    msg['From']    = cfg['from']
+    msg['To']      = destinatario
+
+    texto_simples = (
+        f'{introducao} {codigo}\n'
+        f'Ele expira em {VALIDADE_TEXTO}.\n\n'
+        f'{aviso}'
+    )
+    html = f"""
+    <html><body style="font-family:Arial,sans-serif;color:#1C2434">
+    <h2 style="color:#1E5FD8">{titulo}</h2>
+    <p>Seu código de verificação é:</p>
+    <h1 style="letter-spacing:10px;color:#1E5FD8;font-size:36px">{codigo}</h1>
+    <p>Este código expira em <strong>{VALIDADE_TEXTO}</strong> e é de uso único.</p>
+    <hr style="border:none;border-top:1px solid #E2E8F0"/>
+    <p style="font-size:12px;color:#8C9AAB">{aviso}</p>
+    </body></html>
+    """
+    msg.attach(MIMEText(texto_simples, 'plain', 'utf-8'))
+    msg.attach(MIMEText(html,          'html',  'utf-8'))
+    return msg
+
+
+def _enviar_otp(destinatario: str, codigo: str, *, finalidade: str, assunto: str,
+                titulo: str, introducao: str, aviso: str) -> None:
+    """
+    Fluxo de segurança comum a todo envio de OTP:
       1. Modo TESTING → apenas loga, nunca envia nem conecta à rede.
       2. Verifica configuração → levanta ConfiguracaoEmailAusente se incompleta.
       3. Verifica caixa via IMAP → levanta MailboxNaoAcessivel se inacessível.
@@ -137,52 +178,14 @@ def enviar_codigo(destinatario: str, codigo: str) -> None:
 
     O código OTP nunca é incluído nos logs em produção.
     """
-    # ── Modo teste ─────────────────────────────────────────────────────────
-    testing = (
-        os.environ.get('FLASK_TESTING', '').lower() == 'true'
-        or os.environ.get('TESTING', '').lower() == 'true'
-    )
-    if testing:
-        # Em testes, loga o código (ambiente controlado, sem dados reais)
-        logger.info('[MODO TESTE] Código de recuperação para %s: %s', destinatario, codigo)
+    if _modo_teste():
+        logger.info('[MODO TESTE] Código de %s para %s: %s', finalidade, destinatario, codigo)
         return
 
-    # ── Configuração SMTP ──────────────────────────────────────────────────
     cfg = _config_smtp()
-
-    # ── Verificação IMAP antes de enviar ───────────────────────────────────
-    # Levanta MailboxNaoAcessivel se o servidor IMAP estiver indisponível.
-    # paciente_service captura essa exceção e decide se bloqueia ou continua.
     verificar_caixa_de_entrada()
+    msg = _montar_mensagem(cfg, destinatario, assunto, titulo, introducao, codigo, aviso)
 
-    # ── Monta a mensagem ───────────────────────────────────────────────────
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = 'ReOdonto — Código de recuperação de senha'
-    msg['From']    = cfg['from']
-    msg['To']      = destinatario
-
-    texto_simples = (
-        f'Seu código de recuperação de senha é: {codigo}\n'
-        'Ele expira em 15 minutos.\n\n'
-        'Se você não solicitou essa recuperação, ignore este email.'
-    )
-    html = f"""
-    <html><body style="font-family:Arial,sans-serif;color:#1C2434">
-    <h2 style="color:#1E5FD8">Recuperação de Senha — ReOdonto</h2>
-    <p>Seu código de verificação é:</p>
-    <h1 style="letter-spacing:10px;color:#1E5FD8;font-size:36px">{codigo}</h1>
-    <p>Este código expira em <strong>15 minutos</strong> e é de uso único.</p>
-    <hr style="border:none;border-top:1px solid #E2E8F0"/>
-    <p style="font-size:12px;color:#8C9AAB">
-      Se você não solicitou a recuperação de senha, ignore este email com segurança.
-      Nenhuma alteração foi feita na sua conta.
-    </p>
-    </body></html>
-    """
-    msg.attach(MIMEText(texto_simples, 'plain', 'utf-8'))
-    msg.attach(MIMEText(html,          'html',  'utf-8'))
-
-    # ── Envio SMTP/STARTTLS ────────────────────────────────────────────────
     try:
         with smtplib.SMTP(cfg['server'], cfg['port'], timeout=10) as smtp:
             smtp.ehlo()
@@ -190,11 +193,40 @@ def enviar_codigo(destinatario: str, codigo: str) -> None:
             smtp.ehlo()              # Re-identifica após TLS
             smtp.login(cfg['username'], cfg['password'])
             smtp.sendmail(cfg['from'], destinatario, msg.as_string())
-        # Não loga o código em produção — só confirma o envio
-        logger.info('Email de recuperação enviado para %s', destinatario)
+        logger.info('Email de %s enviado para %s', finalidade, destinatario)
     except smtplib.SMTPException as exc:
         logger.error('Falha SMTP ao enviar para %s: %s', destinatario, exc)
-        raise RuntimeError('Falha ao enviar email de recuperação') from exc
+        raise RuntimeError(f'Falha ao enviar email de {finalidade}') from exc
     except (socket.timeout, OSError) as exc:
         logger.error('Timeout/rede ao enviar para %s: %s', destinatario, exc)
-        raise RuntimeError('Falha de conexão ao enviar email de recuperação') from exc
+        raise RuntimeError(f'Falha de conexão ao enviar email de {finalidade}') from exc
+
+
+def enviar_codigo(destinatario: str, codigo: str) -> None:
+    """Envia o código de recuperação de senha."""
+    _enviar_otp(
+        destinatario, codigo,
+        finalidade='recuperação de senha',
+        assunto='ReOdonto — Código de recuperação de senha',
+        titulo='Recuperação de Senha — ReOdonto',
+        introducao='Seu código de recuperação de senha é:',
+        aviso=(
+            'Se você não solicitou a recuperação de senha, ignore este email com '
+            'segurança. Nenhuma alteração foi feita na sua conta.'
+        ),
+    )
+
+
+def enviar_codigo_verificacao(destinatario: str, codigo: str) -> None:
+    """Envia o código de verificação de email do cadastro."""
+    _enviar_otp(
+        destinatario, codigo,
+        finalidade='verificação de email',
+        assunto='ReOdonto — Confirme seu email',
+        titulo='Confirme seu email — ReOdonto',
+        introducao='Seu código para confirmar o email é:',
+        aviso=(
+            'Se você não criou uma conta no ReOdonto, ignore este email com '
+            'segurança. Nenhuma conta será ativada sem este código.'
+        ),
+    )

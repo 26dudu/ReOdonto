@@ -2,6 +2,13 @@ import os
 import logging
 import secrets
 from datetime import timedelta
+# Carrega variáveis do arquivo .env se existir (python-dotenv opcional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv não instalado — usa variáveis de ambiente do sistema
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -15,13 +22,6 @@ from controllers.painel_controller import painel_bp
 from controllers.cep_controller import cep_bp
 from controllers.google_auth_controller import google_auth_bp
 from controllers.integracao_controller import integracao_bp
-
-# Carrega variáveis do arquivo .env se existir (python-dotenv opcional)
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass  # python-dotenv não instalado — usa variáveis de ambiente do sistema
 
 # --- Logging ---
 logging.basicConfig(
@@ -133,6 +133,7 @@ app.register_blueprint(integracao_bp)
 # --- Registra modelos adicionais para que db.create_all() crie as tabelas ---
 import models.recuperacao_senha_model  # noqa: F401 — registra tabela recuperacao_senha
 import models.oferta_model  # noqa: F401 — registra tabela oferta_adiantamento
+import models.verificacao_email_model  # noqa: F401 — registra tabela verificacao_email
 
 def _aplicar_colunas_novas():
     """
@@ -150,6 +151,15 @@ def _aplicar_colunas_novas():
             'valor': 'FLOAT',
             'encaixe': 'BOOLEAN NOT NULL DEFAULT 0',
         },
+        'dentista': {
+            'email_verificado': 'BOOLEAN NOT NULL DEFAULT 0',
+        },
+    }
+
+    # Contas criadas antes da verificação de email já existem e continuam
+    # entrando: a coluna nova só nasce falsa para quem se cadastrar depois.
+    ajustes_apos_adicionar = {
+        ('dentista', 'email_verificado'): 'UPDATE dentista SET email_verificado = 1',
     }
 
     inspetor = inspect(db.engine)
@@ -161,6 +171,9 @@ def _aplicar_colunas_novas():
             if nome in existentes:
                 continue
             db.session.execute(text(f'ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}'))
+            ajuste = ajustes_apos_adicionar.get((tabela, nome))
+            if ajuste:
+                db.session.execute(text(ajuste))
             logger.info('Coluna %s.%s adicionada ao banco existente.', tabela, nome)
     db.session.commit()
 

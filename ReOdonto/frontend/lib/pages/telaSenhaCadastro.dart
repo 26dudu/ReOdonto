@@ -8,6 +8,7 @@ import '../widgets/botao_visibilidade_senha.dart';
 import '../widgets/cadastro/cabecalhoCadastro.dart';
 import '../widgets/cadastro/campo_cadastro.dart';
 import '../widgets/cadastro/pagina_cadastro.dart';
+import 'telaVerificarEmail.dart';
 
 // MUDANÇAS NESTE ARQUIVO (de 245 para 151 linhas):
 //  • os 5 campos recebidos (nome, email, ...) viraram UM só: `dados` (model DadosCadastro).
@@ -68,11 +69,16 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
 
     mostrarAviso(
       context,
-      'Conta criada com sucesso! Faça login.',
+      'Enviamos um código para o seu email. Digite-o para concluir o cadastro.',
       sucesso: true,
     );
-    // Remove todas as telas e volta para a primeira.
-    Navigator.of(context).popUntil((route) => route.isFirst);
+    // A conta ainda não existe: só é criada quando o código for confirmado.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => TelaVerificarEmail(email: widget.dados.email),
+      ),
+      (route) => route.isFirst,
+    );
   }
 
   @override

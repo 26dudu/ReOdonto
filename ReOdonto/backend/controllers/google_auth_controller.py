@@ -140,6 +140,7 @@ def _entrar_como_dentista(email, nome):
     """
     dentista = dentista_repository.buscar_por_email(email)
     if dentista:
+        dentista_service.marcar_email_verificado(dentista)
         logger.info('Dentista existente entrou com Google: %s', email)
     else:
         dentista = dentista_service.criar_dentista({

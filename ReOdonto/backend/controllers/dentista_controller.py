@@ -2,7 +2,8 @@ from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import create_access_token
 
 import services.dentista_service as service
-from controllers import recuperacao_rotas
+import services.verificacao_email_service as verificacao_email_service
+from controllers import recuperacao_rotas, verificacao_email_rotas
 from utils.auth import dentista_required
 
 dentista_bp = Blueprint('dentista', __name__, url_prefix='/dentistas')
@@ -46,6 +47,12 @@ def login():
 
     try:
         dentista = service.login_dentista(email, senha)
+    except service.EmailNaoVerificado as e:
+        return jsonify({
+            'erro': str(e),
+            'codigo': 'email_nao_verificado',
+            'email': e.email,
+        }), 403
     except ValueError as e:
         return jsonify({'erro': str(e)}), 401
 
@@ -63,19 +70,36 @@ def login():
 
 @dentista_bp.route('/', methods=['POST'])
 def criar():
-    """Cadastro — rota pública."""
+    """
+    Cadastro — rota pública, primeira etapa.
+
+    Valida os dados e envia o código por email, mas NÃO cria a conta: ela só
+    existe depois de POST /dentistas/verificar-email com o código certo.
+    """
     data, erro = _json_ou_erro()
     if erro:
         return erro
     try:
-        dentista = service.criar_dentista(data)
-        return jsonify(dentista.to_dict()), 201
+        resultado = service.solicitar_cadastro(data)
     except ValueError as e:
         return jsonify({'erro': str(e)}), 400
+
+    if resultado == verificacao_email_service.LIMITE_EXCEDIDO:
+        return jsonify({
+            'erro': 'Você já pediu o código várias vezes. Aguarde uma hora e tente de novo.'
+        }), 429
+
+    return jsonify({
+        'mensagem': 'Enviamos um código para o seu email. Digite-o para concluir o cadastro.',
+        'email': data['email'].strip(),
+    }), 202
 
 
 # /dentistas/recuperar-senha e /dentistas/redefinir-senha
 recuperacao_rotas.registrar(dentista_bp)
+
+# /dentistas/verificar-email e /dentistas/reenviar-verificacao
+verificacao_email_rotas.registrar(dentista_bp)
 
 
 # --- Rotas autenticadas ---

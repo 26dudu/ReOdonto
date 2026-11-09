@@ -37,7 +37,7 @@ A lista abaixo reúne os fluxos e operações disponíveis no projeto. Para a av
 2. **Login de dentista com JWT:** autenticação por e-mail e senha e emissão de token para acessar as rotas protegidas.
 3. **Visualização de perfil:** consulta dos dados do dentista autenticado.
 4. **Atualização de perfil:** alteração dos dados pessoais, com validações de segurança.
-5. **Exclusão de conta:** remoção da conta do dentista e dos agendamentos associados.
+5. **Logout:** remoção da conta do dentista e dos agendamentos associados.
 6. **Login com Google:** autenticação por OAuth2, com verificação do token recebido.
 7. **Recuperação de senha por código OTP:** solicitação, validação do código temporário e redefinição da senha.
 
@@ -90,8 +90,6 @@ A integração de WhatsApp está separada da interface Flutter:
 As chaves e credenciais devem ser configuradas por variáveis de ambiente no `.env`. O arquivo `.env.example` serve como modelo. Não publique tokens, senhas ou chaves reais no repositório.
 
 ---
-
-
 
 ## Estrutura do repositório
 

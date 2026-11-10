@@ -3,7 +3,6 @@ import '../../models/resumo_painel.dart';
 import '../../theme/app_colors.dart';
 import 'cartao_indicador.dart';
 
-/// Linha do resumo: ícone + rótulo à esquerda, valor à direita.
 class LinhaResumoTrimestre {
   final IconData icone;
   final String rotulo;
@@ -16,14 +15,10 @@ class LinhaResumoTrimestre {
   });
 }
 
-/// Cartão "Resumo dos últimos 3 meses" (título + cartão branco com as linhas).
 class CartaoResumoTrimestre extends StatelessWidget {
   final List<LinhaResumoTrimestre> linhas;
   const CartaoResumoTrimestre({super.key, required this.linhas});
 
-  // NOVO CONSTRUTOR: antes a telaMenu.dart montava as 4 linhas "na mão".
-  // Agora ela só chama `CartaoResumoTrimestre.deResumo(dadosDoPainel)`.
-  /// Monta o cartão já com as 4 linhas a partir do resumo vindo da API.
   factory CartaoResumoTrimestre.deResumo(ResumoPainel resumo) {
     return CartaoResumoTrimestre(
       linhas: [
@@ -74,7 +69,6 @@ class CartaoResumoTrimestre extends StatelessWidget {
           ),
           child: Column(
             children: [
-              // RENOMEADO: 'i' agora é 'posicao' (posição da linha no for).
               for (int posicao = 0; posicao < linhas.length; posicao++) ...[
                 if (posicao > 0) const SizedBox(height: 10),
                 _Linha(linha: linhas[posicao]),

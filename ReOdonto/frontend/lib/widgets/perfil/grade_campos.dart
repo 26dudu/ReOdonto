@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Distribui [filhos] em [colunas] colunas de larguras iguais.
-/// No celular use 1 coluna; no desktop, 2.
 class GradeCampos extends StatelessWidget {
   final List<Widget> filhos;
   final int colunas;
@@ -21,7 +19,6 @@ class GradeCampos extends StatelessWidget {
           spacing: _espacoH,
           runSpacing: _espacoV,
           children: [
-            // RENOMEADO: 'f' agora é 'filho' (cada widget da lista "filhos").
             for (final filho in filhos) SizedBox(width: largura, child: filho),
           ],
         );

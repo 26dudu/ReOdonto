@@ -3,13 +3,6 @@ import '../../models/agendamento.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/mascaras.dart';
 
-/// Formulário rápido pra agendar um paciente que chegou direto na clínica
-/// — sem passar pelo WhatsApp/app. Pede só nome e telefone; dia, horário
-/// e valor já vêm do horário vago escolhido (mostrados aqui só como
-/// confirmação visual pro dentista).
-///
-/// Retorna via `Navigator.pop` um `Map<String, String>` com `nome` e
-/// `telefone`, ou `null` se o dentista cancelar.
 class DialogoAgendarPaciente extends StatefulWidget {
   final Agendamento agendamento;
 

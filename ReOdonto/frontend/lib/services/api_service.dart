@@ -4,10 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'sessao_usuario.dart';
 
-/// URL base da API — detecta a plataforma automaticamente.
-/// - Emulador Android: http://10.0.2.2:5000
-/// - iOS simulator / web: http://127.0.0.1:5000
-/// - Dispositivo físico na mesma rede: troque pelo IP da máquina
 String get _baseUrl {
   if (kIsWeb) return 'http://127.0.0.1:5000';
   if (Platform.isAndroid) return 'http://10.0.2.2:5000';
@@ -19,7 +15,6 @@ Map<String, String> get _headersPublicos => {
   'Accept': 'application/json',
 };
 
-/// Headers com JWT — usar em rotas protegidas
 Map<String, String> get _headersAuth {
   final token = SessaoUsuario.token;
   return {
@@ -29,7 +24,6 @@ Map<String, String> get _headersAuth {
   };
 }
 
-/// Resultado genérico de uma chamada HTTP.
 class ApiResultado<T> {
   final T? dados;
   final String? erro;
@@ -41,11 +35,6 @@ class ApiResultado<T> {
 }
 
 class ApiService {
-  // ----------------------------------------------------------------
-  // CADASTRO DENTISTA — POST /dentistas/
-  // Primeira etapa: valida os dados e envia o código por email (202).
-  // A conta só é criada em verificarEmail, quando o código é digitado.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> cadastrar({
     required String nome,
     required String email,
@@ -53,7 +42,6 @@ class ApiService {
     String? telefone,
     String? cpfCnpj,
     String? cro,
-    // Campos legados (ignorados no cadastro de dentista)
     String? cpf,
     String? cep,
     String? rua,
@@ -89,10 +77,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // LOGIN DENTISTA — POST /dentistas/login
-  // Retorna { token, dentista }
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> loginDentista({
     required String email,
     required String senha,
@@ -119,10 +103,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // VERIFICAR EMAIL — POST /dentistas/verificar-email
-  // Segunda etapa do cadastro: com o código de 6 dígitos, cria a conta.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> verificarEmail({
     required String email,
     required String codigo,
@@ -133,9 +113,6 @@ class ApiService {
         erroPadrao: 'Código inválido ou expirado',
       );
 
-  // ----------------------------------------------------------------
-  // REENVIAR VERIFICAÇÃO — POST /dentistas/reenviar-verificacao
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> reenviarVerificacaoEmail({
     required String email,
   }) =>
@@ -174,10 +151,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // LOGIN — POST /pacientes/login
-  // Retorna { token, paciente }
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> login({
     required String email,
     required String senha,
@@ -204,10 +177,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // BUSCA CEP — direto na BrasilAPI (não passa pelo backend)
-  // Retorna { cep, logradouro, bairro, cidade, estado }
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> buscarCep(String cep) async {
     final cepLimpo = cep.replaceAll(RegExp(r'\D'), '');
     if (cepLimpo.length != 8) {
@@ -243,9 +212,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // CLÍNICAS — GET /clinicas/?page=1&per_page=20
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> listarClinicas({
     int page = 1,
     int perPage = 20,
@@ -267,9 +233,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // AGENDAMENTOS — GET /agendamentos/
-  // ----------------------------------------------------------------
   static Future<ApiResultado<List<dynamic>>> listarAgendamentos() async {
     try {
       final response = await http
@@ -288,21 +251,9 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // CRIAR AGENDAMENTO — POST /agendamentos/
-  // O app é usado só pelo dentista, então quem chega aqui é sempre um
-  // paciente sem conta (nome + telefone), tipo de consulta (texto livre) e data/hora.
-  //
-  // Sem `nomePaciente` o backend cria um HORÁRIO VAGO, que depois recebe um
-  // encaixe pelo botão "Agendar Paciente".
-  // `valor` alimenta o "prejuízo evitado" do painel; `duracaoMinutos` é
-  // usado pelo backend para recusar horários que se sobrepõem.
-  //
-  // O dentista é sempre o do token — o backend ignora `dentistaId`.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> criarAgendamento({
     required int dentistaId,
-    required String dataHora, // ISO 8601: "2025-08-15T14:00:00"
+    required String dataHora,
     String? nomePaciente,
     String? telefonePaciente,
     int? clinicaId,
@@ -340,9 +291,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // STATUS DO AGENDAMENTO — PATCH /agendamentos/<id>/status
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> _atualizarStatus(
     int id,
     String status,
@@ -367,19 +315,12 @@ class ApiService {
     }
   }
 
-  /// Cancela a consulta. O backend abre um horário vago no mesmo lugar e o
-  /// devolve em `horario_liberado` — é o horário que entra na realocação.
   static Future<ApiResultado<Map<String, dynamic>>> cancelarAgendamento(int id) =>
       _atualizarStatus(id, 'cancelado', 'Erro ao cancelar agendamento');
 
-  /// Marca o atendimento como realizado (status `concluido`).
   static Future<ApiResultado<Map<String, dynamic>>> concluirAgendamento(int id) =>
       _atualizarStatus(id, 'concluido', 'Erro ao confirmar atendimento');
 
-  // ----------------------------------------------------------------
-  // PAINEL — GET /painel/resumo
-  // Devolve o JSON que ResumoPainel.fromJson consome.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> buscarResumoPainel() async {
     try {
       final response = await http
@@ -396,14 +337,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // AGENDAR PACIENTE WALK-IN — PATCH /agendamentos/<id>/paciente-rapido
-  // Preenche um horário vago com nome + telefone de um paciente que
-  // chegou direto na clínica (ex: idosos que não usam o WhatsApp/app).
-  // Não é um cadastro completo — só o suficiente pra identificar quem
-  // vai ser atendido naquele horário.
-  // Ajuste a rota abaixo para o endpoint real do backend quando existir.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> agendarPacienteRapido({
     required int agendamentoId,
     required String nome,
@@ -430,12 +363,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // ESQUECI MINHA SENHA — POST /dentistas/recuperar-senha
-  // Envia (ou reenvia) o código de verificação para o email informado.
-  // Antes apontava para /pacientes, que só achava contas de paciente: o
-  // dentista — quem usa o app — não conseguia recuperar a senha.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> solicitarCodigoRecuperacao({
     required String email,
   }) async {
@@ -461,10 +388,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // REDEFINIR SENHA — POST /dentistas/redefinir-senha
-  // Confirma o código recebido por email e define a nova senha.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> redefinirSenha({
     required String email,
     required String codigo,
@@ -496,9 +419,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // LISTAR DENTISTAS — GET /dentistas/?clinica_id=X (opcional)
-  // ----------------------------------------------------------------
   static Future<ApiResultado<List<dynamic>>> listarDentistas({int? clinicaId}) async {
     try {
       final uri = Uri.parse('$_baseUrl/dentistas/').replace(
@@ -520,9 +440,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // BUSCAR PERFIL DENTISTA — GET /dentistas/<id>
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> buscarPerfil(int id) async {
     try {
       final response = await http
@@ -542,9 +459,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // ATUALIZAR PERFIL DENTISTA — PUT /dentistas/<id>
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> atualizarPerfil(
     int id, {
     required String nome,
@@ -580,11 +494,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // DELETAR PERFIL — DELETE /dentistas/<id>
-  // Antes chamava /pacientes/<id> com o id do dentista: a exclusão falhava
-  // ou, pior, apagava o paciente que tivesse por acaso o mesmo id.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<void>> deletarConta(int id) async {
     try {
       final response = await http
@@ -604,13 +513,6 @@ class ApiService {
     }
   }
 
-  // ----------------------------------------------------------------
-  // LOGIN GOOGLE — POST /auth/google/verify-token
-  // Envia o idToken (web) ou accessToken (mobile) obtido pelo
-  // GoogleSignIn para o backend verificar e retornar um JWT próprio.
-  // Retorna { token, dentista, google_auth: true } — o mesmo formato do
-  // login por senha, então SessaoUsuario.salvar trata os dois igual.
-  // ----------------------------------------------------------------
   static Future<ApiResultado<Map<String, dynamic>>> loginGoogle({
     String? idToken,
     String? accessToken,

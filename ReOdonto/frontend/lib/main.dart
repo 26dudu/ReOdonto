@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-// Português do Brasil nos widgets nativos (calendário, botões, meses...).
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:device_preview/device_preview.dart';
@@ -33,7 +32,6 @@ class MeuApp extends StatelessWidget {
     return MaterialApp(
       title: 'ReOdonto',
 
-      // Idioma do app: o showDatePicker (SeletorDia) e demais widgets saem em português.
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: const [
@@ -53,11 +51,7 @@ class MeuApp extends StatelessWidget {
         ),
       ),
       home: temSessao ? const TelaPerfil() : const TelaLogin(),
-      //home:  const TelaPerfil(),
-      //home: TelaNovaSenha(email: 'teste@teste.com'),
-      //home: const TelaLogin(),
 
-      // Rotas usadas pelo menu de navegação (widgets/menu_navegacao.dart).
       routes: {
         '/perfil': (context) => const TelaPerfil(),
         '/agenda': (context) => const TelaAgenda(),

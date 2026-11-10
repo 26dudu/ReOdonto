@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Gerencia o estado do usuário logado (paciente ou dentista).
 class SessaoUsuario {
   SessaoUsuario._();
 
@@ -9,18 +8,11 @@ class SessaoUsuario {
   static String? nome;
   static String? email;
   static String? token;
-  static String? tipo; // 'paciente' | 'dentista'
+  static String? tipo;
 
   static bool get ehDentista => tipo == 'dentista';
 
-  // -------------------------------------------------------------------
-  // Salvar sessão após login — suporta paciente e dentista
-  // Formato: { "token": "...", "paciente": {...} }  OU
-  //          { "token": "...", "dentista":  {...} }
-  // -------------------------------------------------------------------
   static Future<void> salvar(Map<String, dynamic> resposta) async {
-    // Zera a sessão anterior: o fallback abaixo usa `??=`, e sem isto o nome
-    // ou o tipo de quem estava logado antes podia sobrar na sessão nova.
     id = null;
     nome = null;
     email = null;
@@ -28,7 +20,6 @@ class SessaoUsuario {
 
     token = resposta['token'] as String?;
 
-    // Dentista
     final dentista = resposta['dentista'] as Map<String, dynamic>?;
     if (dentista != null) {
       id    = dentista['id'] as int?;
@@ -37,7 +28,6 @@ class SessaoUsuario {
       tipo  = 'dentista';
     }
 
-    // Paciente
     final paciente = resposta['paciente'] as Map<String, dynamic>?;
     if (paciente != null) {
       id    = paciente['id'] as int?;
@@ -46,7 +36,6 @@ class SessaoUsuario {
       tipo  = 'paciente';
     }
 
-    // Fallback via claims JWT
     if (token != null && (nome == null || email == null)) {
       final claims = _decodificarPayloadJwt(token!);
       id   ??= int.tryParse(claims['sub']?.toString() ?? '');
@@ -58,9 +47,6 @@ class SessaoUsuario {
     await _persistir();
   }
 
-  // -------------------------------------------------------------------
-  // Salvar com parâmetros individuais (Google Auth)
-  // -------------------------------------------------------------------
   static Future<void> salvarComParametros({
     required int id,
     required String nome,
@@ -76,9 +62,6 @@ class SessaoUsuario {
     await _persistir();
   }
 
-  // -------------------------------------------------------------------
-  // Carregar sessão salva — retorna false se expirada/inexistente
-  // -------------------------------------------------------------------
   static Future<bool> carregar() async {
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString('token');
@@ -92,9 +75,6 @@ class SessaoUsuario {
     return true;
   }
 
-  // -------------------------------------------------------------------
-  // Limpar sessão no logout
-  // -------------------------------------------------------------------
   static Future<void> limpar() async {
     token = null; id = null; nome = null; email = null; tipo = null;
     final prefs = await SharedPreferences.getInstance();
@@ -103,7 +83,6 @@ class SessaoUsuario {
     await prefs.remove('usuario_nome');
     await prefs.remove('usuario_email');
     await prefs.remove('usuario_tipo');
-    // compatibilidade com chaves antigas
     await prefs.remove('paciente_id');
     await prefs.remove('paciente_nome');
     await prefs.remove('paciente_email');
@@ -112,9 +91,6 @@ class SessaoUsuario {
   static bool get estaLogado =>
       id != null && token != null && !_tokenEstaExpirado(token!);
 
-  // -------------------------------------------------------------------
-  // Internos
-  // -------------------------------------------------------------------
   static Future<void> _persistir() async {
     final prefs = await SharedPreferences.getInstance();
     if (token != null) await prefs.setString('token', token!);

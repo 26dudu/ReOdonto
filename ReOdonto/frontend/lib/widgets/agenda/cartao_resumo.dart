@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-// Resumo do agendamento (paciente + tipo de consulta), mostrado na última etapa do modal de novo agendamento antes de escolher a data
 class CartaoResumo extends StatelessWidget {
   final String paciente;
   final String consulta;

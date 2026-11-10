@@ -12,11 +12,6 @@ import '../widgets/recuperarSenha/pagina_autenticacao.dart';
 import 'telaCadastro.dart';
 import 'telaEsqueciSenha.dart';
 
-// MUDANÇAS NESTE ARQUIVO (de 261 para 222 linhas):
-//  • o Scaffold/rolagem/coluna centralizada/CabecalhoMarca viraram o widget PaginaAutenticacao.
-//  • o divisor "— ou —" virou o widget DivisorComTexto.
-//  • o "olhinho" da senha virou o widget BotaoVisibilidadeSenha.
-
 class TelaLogin extends StatefulWidget {
   const TelaLogin({super.key});
 
@@ -54,9 +49,6 @@ class _TelaLoginState extends State<TelaLogin> {
 
     setState(() => _carregando = true);
 
-    // O app é do dentista. Antes, se o login de dentista falhasse, o app
-    // tentava como paciente — e o paciente entrava numa agenda em que toda
-    // chamada é recusada (as rotas exigem token de dentista).
     final resultado = await ApiService.loginDentista(email: email, senha: senha);
 
     if (!mounted) return;
@@ -93,7 +85,6 @@ class _TelaLoginState extends State<TelaLogin> {
         );
         mostrarAviso(context, 'Bem-vindo, ${SessaoUsuario.nome}!');
       case GoogleCancelado():
-        // Usuário fechou o seletor — não exibe erro
         break;
       case GoogleErro(:final mensagem):
         mostrarAviso(context, mensagem, erro: true);
@@ -113,7 +104,6 @@ class _TelaLoginState extends State<TelaLogin> {
 
   @override
   Widget build(BuildContext context) {
-    // true se qualquer um dos dois logins (e-mail/senha ou Google) está em andamento.
     final ocupado = _carregando || _carregandoGoogle;
 
     return PaginaAutenticacao(
@@ -176,11 +166,9 @@ class _TelaLoginState extends State<TelaLogin> {
         ),
         const SizedBox(height: 20),
 
-        // ── Divisor ──────────────────────────────────────────
         const DivisorComTexto('ou'),
         const SizedBox(height: 20),
 
-        // ── Botão Google ──────────────────────────────────────
         _carregandoGoogle
             ? const SizedBox(
                 height: 50,

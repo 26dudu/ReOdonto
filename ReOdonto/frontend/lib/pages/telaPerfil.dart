@@ -13,10 +13,6 @@ import '../widgets/perfil/pilula_info.dart';
 import '../widgets/secoes_texto.dart';
 import 'telaLogin.dart';
 
-// MUDANÇAS NESTE ARQUIVO (de 306 para 274 linhas): o pop-up de logout usa
-// confirmarAcao (utils/dialogos.dart) e os botões Salvar/Cancelar viraram o
-// widget BotoesEdicaoPerfil.
-
 class TelaPerfil extends StatefulWidget {
   const TelaPerfil({super.key});
 
@@ -46,7 +42,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
 
   @override
   void dispose() {
-    // RENOMEADO: 'c' agora é 'controlador' (cada TextEditingController liberado no dispose).
     for (final controlador in [_nome, _email, _telefone, _cro]) {
       controlador.dispose();
     }
@@ -110,7 +105,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       return mostrarAviso(context, resultado.erro!, erro: true);
     }
 
-    // Atualiza a sessão local.
     await SessaoUsuario.salvar({
       'dentista': resultado.dados,
       'token': SessaoUsuario.token,
@@ -130,7 +124,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       _editando ? _cancelarEdicao() : setState(() => _editando = true);
 
   Future<void> _logout() async {
-    // MUDANÇA: o AlertDialog escrito à mão virou a função confirmarAcao (utils/dialogos.dart).
     final sair = await confirmarAcao(
       context,
       titulo: 'Confirmar Logout',
@@ -158,7 +151,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
       carregando: _carregando,
       erro: _erro,
       onTentarNovamente: _carregarPerfil,
-      // Desktop: título + botões no cabeçalho (o celular os põe no corpo).
       tituloDesktop: Text(
         _nome.text.isEmpty ? 'Meu Perfil' : _nome.text,
         style: const TextStyle(
@@ -192,7 +184,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
   }
 
   Widget _corpo(bool celular) {
-    // RENOMEADO: 'c' agora é 'controlador' (TextEditingController do campo).
     Widget campo(
       String rotulo,
       TextEditingController controlador, {
@@ -206,7 +197,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Celular: título + editar/sair aqui. Desktop: só o título.
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -260,7 +250,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
             campo('Nome Completo:', _nome),
             campo('Email:', _email),
             campo('Telefone:', _telefone),
-            campo('CRO:', _cro, editavel: false), // CRO não é editável
+            campo('CRO:', _cro, editavel: false),
             const CampoEstatico(
               rotulo: 'Tipo de conta:',
               valor: 'Dentista',
@@ -270,7 +260,6 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
         ),
         if (_editando) ...[
           const SizedBox(height: 24),
-          // MUDANÇA: o método _botoesEdicao virou o widget BotoesEdicaoPerfil.
           BotoesEdicaoPerfil(
             celular: celular,
             salvando: _salvando,

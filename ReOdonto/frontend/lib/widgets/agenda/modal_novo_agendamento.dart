@@ -9,29 +9,7 @@ import 'etapa_data_hora.dart';
 import '../../utils/avisos.dart';
 import '../botao_principal.dart';
 
-// =============================================================================
-// Modal de Novo Agendamento
-//
-// Fluxo em 3 etapas: Dados do Paciente → Tipo de Consulta → Data/Hora
-//
-// Esse formulário é pro dentista cadastrar um paciente que chegou direto
-// na clínica (ex: idosos que não usam o WhatsApp/app). Não pede clínica
-// nem dentista pra selecionar: o app é de uso individual do dentista, ele
-// já É a clínica/dentista logado — não faz sentido "escolher" isso.
-//
-// Cada etapa vive em seu próprio widget (etapa_paciente.dart,
-// etapa_consulta.dart, etapa_data_hora.dart). Este arquivo cuida só do
-// estado compartilhado e da lógica de navegação/confirmação.
-//
-// O backend sempre usa o dentista do token JWT; `dentistaId` vai no corpo
-// só por compatibilidade e é ignorado lá.
-//
-// Com "Abrir horário vago" ligado na primeira etapa, o horário é criado
-// sem paciente e aparece na agenda pronto para um encaixe.
-// =============================================================================
-
 class ModalNovoAgendamento extends StatefulWidget {
-  // Entrega a data do agendamento criado, para a telaAgenda pular para esse dia.
   final ValueChanged<DateTime> onAgendamentoCriado;
   const ModalNovoAgendamento({super.key, required this.onAgendamentoCriado});
 
@@ -40,22 +18,18 @@ class ModalNovoAgendamento extends StatefulWidget {
 }
 
 class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
-  // ---- dados do paciente (cadastro rápido, sem conta) ----
   final _chaveFormularioPaciente = GlobalKey<FormState>();
   final _controladorNomePaciente = TextEditingController();
   final _controladorTelefonePaciente = TextEditingController();
 
-  // ---- estado da seleção ----
   DateTime? _dataHoraSelecionada;
   TimeOfDay? _horarioSelecionado;
   final _controladorConsultaCustomizada = TextEditingController();
   final _controladorValor = TextEditingController();
   final _controladorDuracao = TextEditingController(text: '30');
 
-  // true = cria um horário vago, sem paciente, pronto para um encaixe.
   bool _horarioVago = false;
 
-  // ---- controle de UI ----
   int _etapa = 0;
   bool _salvando = false;
 
@@ -112,11 +86,9 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     if (_etapa > 0) setState(() => _etapa--);
   }
 
-
   Future<void> _confirmarAgendamento() async {
     setState(() => _salvando = true);
 
-    // Combina a data selecionada com o horário
     final dataComHora = DateTime(
       _dataHoraSelecionada!.year,
       _dataHoraSelecionada!.month,
@@ -126,8 +98,6 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     );
     final iso = dataComHora.toIso8601String().substring(0, 19);
 
-    // Dentista logado — vem da sessão. O app não pede pra selecionar
-    // porque cada dentista só enxerga e mexe na própria agenda.
     final dentistaId = SessaoUsuario.id;
     if (dentistaId == null) {
       setState(() => _salvando = false);
@@ -136,11 +106,9 @@ class _EstadoModalNovoAgendamento extends State<ModalNovoAgendamento> {
     }
 
     final consulta = _controladorConsultaCustomizada.text.trim();
-    // RENOMEADO: 'r' agora é 'resultado' (resposta (ApiResultado) da API ao criar o agendamento).
     final resultado = await ApiService.criarAgendamento(
       dentistaId: dentistaId,
       dataHora: iso,
-      // Sem nome o backend cria um horário vago.
       nomePaciente: _horarioVago ? null : _controladorNomePaciente.text.trim(),
       telefonePaciente:
           _horarioVago ? null : _controladorTelefonePaciente.text.trim(),

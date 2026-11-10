@@ -2,11 +2,6 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/mascaras.dart';
 
-
-// Cadastro rápido: nome e telefone do paciente que chegou direto na clínica.
-// Com "Abrir horário vago" ligado, o horário é criado sem paciente e fica
-// disponível na agenda para um encaixe depois.
-
 class EtapaPaciente extends StatelessWidget {
   final GlobalKey<FormState> chaveFormulario;
   final TextEditingController controladorNome;

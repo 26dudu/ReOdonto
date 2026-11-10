@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-// Mostra os tracinhos horizontais no topo do modal
 class IndicadorProgresso extends StatelessWidget {
   final int etapaAtual;
   final int totalEtapas;
@@ -15,7 +14,6 @@ class IndicadorProgresso extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      // RENOMEADO: 'i' agora é 'posicao' (posição da barrinha (0, 1, 2...)).
       children: List.generate(totalEtapas, (posicao) {
         final ativo = posicao == etapaAtual;
         final concluido = posicao < etapaAtual;

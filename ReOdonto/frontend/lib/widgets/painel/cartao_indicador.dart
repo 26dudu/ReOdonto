@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-/// Sombra suave usada pelos cartões brancos do painel.
 const List<BoxShadow> sombraCartaoPainel = [
   BoxShadow(color: Color(0x1A000000), blurRadius: 14, offset: Offset(0, 4)),
 ];
 
-/// Cartão do topo do painel: ícone num círculo colorido + título + valor.
-/// Ex.: [$] Prejuízo evitado / R$ 8.450
 class CartaoIndicador extends StatelessWidget {
   final IconData icone;
-  final Color corIcone; // cor do ícone e do valor
+  final Color corIcone;
   final String titulo;
   final String valor;
 

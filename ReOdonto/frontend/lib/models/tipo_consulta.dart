@@ -1,10 +1,3 @@
-// =============================================================================
-// NOVO ARQUIVO — models/tipo_consulta.dart
-//
-// Representa um procedimento cadastrado no backend (GET /consultas/):
-// Limpeza, Canal, Clareamento... com valor e duração estimada.
-// É usado na etapa "Tipo de Consulta" do modal, no lugar do texto livre.
-// =============================================================================
 class TipoConsulta {
   final int id;
   final String nome;
@@ -20,7 +13,6 @@ class TipoConsulta {
     this.duracaoMinutos,
   });
 
-  /// Converte o JSON do backend: { id, nome, descricao, valor, duracao_minutos }
   factory TipoConsulta.fromJson(Map<String, dynamic> json) {
     return TipoConsulta(
       id: json['id'] as int,

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
-/// Círculo branco com o ícone do dente.
-/// Antes estava copiado em telaLogin, telaAgenda e telaPerfil.
 class LogoDente extends StatelessWidget {
   const LogoDente({super.key});
 

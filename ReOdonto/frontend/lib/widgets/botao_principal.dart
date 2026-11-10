@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 
-/// Botão largo de ação principal (Entrar, Continuar, Criar conta...).
-/// Mostra um indicador de progresso no lugar do texto quando [carregando].
-/// Passe `onPressed: null` para desabilitar.
 class BotaoPrincipal extends StatelessWidget {
   final String texto;
   final VoidCallback? onPressed;

@@ -3,34 +3,21 @@ import '../theme/app_colors.dart';
 import 'menu_navegacao.dart';
 import 'logo_dente.dart';
 
-/// "Moldura" das páginas logadas (Agenda, Perfil...).
-///
-/// Cuida de tudo que era repetido em cada tela:
-///  • Scaffold + menu (drawer no celular, barra lateral no desktop);
-///  • troca de layout celular/desktop;
-///  • cabeçalho com o logo;
-///  • estados de carregando e de erro.
-///
-/// A tela só entrega o [corpo] (o conteúdo em si).
 class PaginaComMenu extends StatelessWidget {
   final PaginaApp pagina;
-  /// Recebe `celular` (true/false) para a tela variar o que precisar.
   final Widget Function(bool celular) corpo;
 
   final bool carregando;
   final String? erro;
   final VoidCallback? onTentarNovamente;
 
-  /// Se informado, liga o "puxar para atualizar".
   final Future<void> Function()? onAtualizar;
 
   final Widget? botaoFlutuante;
 
-  /// Só desktop: título à esquerda do cabeçalho e botões antes do logo.
   final Widget? tituloDesktop;
   final List<Widget> acoesDesktop;
 
-  /// Só desktop: largura máxima do conteúdo (null = ocupa tudo).
   final double? larguraMaxima;
 
   const PaginaComMenu({
@@ -65,7 +52,6 @@ class PaginaComMenu extends StatelessWidget {
     );
   }
 
-  /// O que aparece no lugar do corpo enquanto carrega ou se deu erro.
   Widget _conteudo(bool celular) {
     if (carregando) {
       return const Center(
@@ -81,8 +67,6 @@ class PaginaComMenu extends StatelessWidget {
     return corpo(celular);
   }
 
-  /// Envolve em RefreshIndicator só se a tela pediu.
-  /// AlwaysScrollable: permite "puxar" mesmo com pouco conteúdo.
   Widget _rolavel({required EdgeInsets padding, required Widget filho}) {
     final rolagem = SingleChildScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -147,7 +131,6 @@ class PaginaComMenu extends StatelessWidget {
   }
 }
 
-/// Mensagem de erro + botão "Tentar novamente".
 class EstadoErro extends StatelessWidget {
   final String mensagem;
   final VoidCallback? onTentarNovamente;

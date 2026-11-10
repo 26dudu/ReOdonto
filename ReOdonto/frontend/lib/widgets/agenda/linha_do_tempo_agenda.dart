@@ -3,21 +3,6 @@ import '../../models/agendamento.dart';
 import '../../theme/app_colors.dart';
 import 'cartao_consulta.dart';
 
-
-// Mostra o dia como uma LINHA DO TEMPO: horário à esquerda, uma linha vertical
-// com bolinhas no meio e o cartão da consulta à direita.
-//
-// Consultas marcadas e horários vagos ficam JUNTOS, em ordem de horário, então
-// o dentista enxerga os "buracos" do dia de relance.
-//
-// Cor da bolinha:
-//   • verde  = consulta confirmada
-//   • laranja = consulta pendente
-//   • vazada (borda azul clara) = horário vago
-//
-// A lista `itens` já deve chegar ORDENADA por horário (a telaAgenda faz isso).
-
-
 class LinhaDoTempoAgenda extends StatelessWidget {
   final List<Agendamento> itens;
   final ValueChanged<Agendamento> onConfirmar;
@@ -49,10 +34,9 @@ class LinhaDoTempoAgenda extends StatelessWidget {
   }
 }
 
-/// Uma linha da linha do tempo: [horário] [bolinha+traço] [cartão].
 class _ItemLinhaDoTempo extends StatelessWidget {
   final Agendamento agendamento;
-  final bool ultimo; // o último item não desenha o traço para baixo
+  final bool ultimo;
   final VoidCallback onConfirmar;
   final VoidCallback onCancelar;
   final VoidCallback onAgendar;
@@ -72,12 +56,10 @@ class _ItemLinhaDoTempo extends StatelessWidget {
         ? Colors.white
         : (agendamento.concluido ? AppColors.confirmado : AppColors.pendente);
 
-    // IntrinsicHeight faz o traço vertical esticar até a altura do cartão.
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ---- Coluna 1: horário ------------------------------------------------
           SizedBox(
             width: 50,
             child: Padding(
@@ -95,7 +77,6 @@ class _ItemLinhaDoTempo extends StatelessWidget {
           ),
           const SizedBox(width: 10),
 
-          // ---- Coluna 2: bolinha + traço vertical ---------------------------------
           SizedBox(
             width: 14,
             child: Column(
@@ -122,7 +103,6 @@ class _ItemLinhaDoTempo extends StatelessWidget {
           ),
           const SizedBox(width: 10),
 
-          // ---- Coluna 3: cartão ---------------------------------------------------
           Expanded(
             child: Padding(
               padding: const EdgeInsets.only(bottom: 14),

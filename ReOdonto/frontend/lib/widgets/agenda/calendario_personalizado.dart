@@ -68,18 +68,15 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
     final ultimo = DateTime(year, month + 1, 0);
     final dias = <DateTime>[];
 
-    // Adiciona dias em branco do mês anterior
     for (int diasAntes = primeiro.weekday - 1; diasAntes > 0; diasAntes--) {
       dias.add(primeiro.subtract(Duration(days: diasAntes)));
     }
 
-    // Adiciona todos os dias do mês
     for (int diaDoMes = 1; diaDoMes <= ultimo.day; diaDoMes++) {
       dias.add(DateTime(year, month, diaDoMes));
     }
 
-    // Completa com dias do próximo mês se necessário
-    final diasFaltantes = 42 - dias.length; // 6 linhas × 7 dias
+    final diasFaltantes = 42 - dias.length;
     for (int diasDepois = 1; diasDepois <= diasFaltantes; diasDepois++) {
       dias.add(ultimo.add(Duration(days: diasDepois)));
     }
@@ -91,7 +88,6 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
     final hojeSemHora = _semHora(DateTime.now());
     final diaSemHora = _semHora(dia);
 
-    // Desabilita datas no passado e fora do intervalo permitido
     if (diaSemHora.isBefore(hojeSemHora)) return true;
     if (diaSemHora.isBefore(_semHora(widget.dataInicial))) return true;
     if (diaSemHora.isAfter(_semHora(widget.dataFinal))) return true;
@@ -99,7 +95,6 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
     return false;
   }
 
-  // RENOMEADO: 'd' agora é 'data' (data cuja hora será zerada).
   DateTime _semHora(DateTime data) => DateTime(data.year, data.month, data.day);
 
   bool _pertenceAoMes(DateTime dia) {
@@ -114,7 +109,6 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
 
     return Column(
       children: [
-        // Cabeçalho com navegação de meses
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
@@ -146,7 +140,6 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
           ),
         ),
 
-        //Cabeçalho com dias da semana
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: Row(
@@ -165,7 +158,6 @@ class _CalendarioPersonalizadoState extends State<CalendarioPersonalizado> {
 
         const SizedBox(height: 8),
 
-        // Grade de dias
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: GridView.builder(

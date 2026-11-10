@@ -1,9 +1,8 @@
 import 'package:intl/intl.dart';
 
-/// Um mês do gráfico "Desempenho dos últimos meses".
 class MesDesempenho {
-  final String rotulo; // "Jun", "Jul"...
-  final double valor; // prejuízo evitado no mês, em R$
+  final String rotulo;
+  final double valor;
 
   const MesDesempenho({required this.rotulo, required this.valor});
 
@@ -13,41 +12,17 @@ class MesDesempenho {
       );
 }
 
-/// Todos os números do Painel Administrativo (tela "Menu").
-///
-/// Hoje o app usa [ResumoPainel.vazio] (tudo zerado). Quando o backend Python
-/// existir, ele só precisa devolver um JSON neste formato e a tela passa a
-/// mostrar os dados reais, sem mudar nenhum widget:
-///
-/// ```json
-/// {
-///   "prejuizo_evitado": 8450.0,
-///   "ociosidade": 12.0,
-///   "horarios_recuperados": 24,
-///   "pacientes_encaixados": 21,
-///   "resumo_3_meses": {
-///     "consultas_realizadas": 84,
-///     "cancelamentos": 28,
-///     "horarios_recuperados": 24,
-///     "taxa_ocupacao": 88.0
-///   },
-///   "desempenho": [ {"mes": "Jun", "valor": 350.0}, ... ]
-/// }
-/// ```
 class ResumoPainel {
-  // Cartões do topo.
   final double prejuizoEvitado;
-  final double ociosidade; // percentual (12.0 = 12%)
+  final double ociosidade;
   final int horariosRecuperados;
   final int pacientesEncaixados;
 
-  // "Resumo dos últimos 3 meses".
   final int consultasRealizadas;
   final int cancelamentos;
   final int horariosRecuperados3Meses;
-  final double taxaOcupacao; // percentual
+  final double taxaOcupacao;
 
-  // Gráfico, do mês mais antigo para o mais recente.
   final List<MesDesempenho> desempenho;
 
   const ResumoPainel({
@@ -62,7 +37,6 @@ class ResumoPainel {
     required this.desempenho,
   });
 
-  /// Tudo zerado, com os 6 últimos meses já nomeados no gráfico.
   factory ResumoPainel.vazio() => ResumoPainel(
         prejuizoEvitado: 0,
         ociosidade: 0,
@@ -90,20 +64,16 @@ class ResumoPainel {
           (resumo['horarios_recuperados'] as num?)?.toInt() ?? 0,
       taxaOcupacao: (resumo['taxa_ocupacao'] as num?)?.toDouble() ?? 0,
       desempenho: lista
-          // RENOMEADO: 'e' agora é 'itemJson' (cada item da lista "desempenho" vindo do JSON).
           .map((itemJson) => MesDesempenho.fromJson(itemJson as Map<String, dynamic>))
           .toList(),
     );
   }
 
-  /// true quando não há nada para mostrar no gráfico.
-  // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de desempenho).
   bool get graficoVazio => desempenho.every((mes) => mes.valor <= 0);
 
   static List<MesDesempenho> _ultimosMeses(int quantidade) {
     final agora = DateTime.now();
     final formato = DateFormat('MMM', 'pt_BR');
-    // RENOMEADO: 'i' agora é 'posicao' (posição (0, 1, 2...) do mês que está sendo gerado).
     return List.generate(quantidade, (posicao) {
       final mes = DateTime(agora.year, agora.month - (quantidade - 1 - posicao));
       final nome = formato.format(mes).replaceAll('.', '');

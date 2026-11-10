@@ -9,14 +9,8 @@ final NumberFormat _reais =
     NumberFormat.currency(locale: 'pt_BR', symbol: r'R$', decimalDigits: 0);
 final NumberFormat _numero = NumberFormat.decimalPattern('pt_BR');
 
-/// "R$ 8.450" (sem centavos), usado nos cartões e no gráfico.
 String formatarReaisInteiro(double valor) => _reais.format(valor);
 
-/// Gráfico "Desempenho dos últimos meses" (prejuízo evitado em R$).
-///
-/// Feito só com widgets do Flutter (sem pacote de gráficos).
-///  • desktop: barras verticais com linhas de grade;
-///  • celular: barras horizontais, mês mais recente em cima.
 class GraficoDesempenho extends StatelessWidget {
   final List<MesDesempenho> dados;
   final bool celular;
@@ -29,7 +23,6 @@ class GraficoDesempenho extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
     final vazio = dados.every((mes) => mes.valor <= 0);
 
     return Column(
@@ -68,7 +61,6 @@ class GraficoDesempenho extends StatelessWidget {
   }
 }
 
-/// Mensagem quando ainda não há dados para o gráfico.
 class TextoSemDados extends StatelessWidget {
   const TextoSemDados({super.key});
 
@@ -89,26 +81,21 @@ class TextoSemDados extends StatelessWidget {
   }
 }
 
-/// Maior valor "redondo" do eixo (ex.: 2500 -> 3000), para as linhas de grade
-/// caírem em números bonitos.
 double _maximoDoEixo(List<MesDesempenho> dados) {
-  // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
   final maior = dados.map((mes) => mes.valor).fold<double>(0, math.max);
   if (maior <= 0) return 1;
   final magnitude = math.pow(10, (math.log(maior) / math.ln10).floor());
-  final passo = magnitude / 2; // 1000 -> 500
+  final passo = magnitude / 2;
   return (maior / passo).ceil() * passo.toDouble();
 }
-
-// ───────────────────────── barras verticais (desktop) ─────────────────────────
 
 class _BarrasVerticais extends StatelessWidget {
   final List<MesDesempenho> dados;
   const _BarrasVerticais({required this.dados});
 
   static const double _altura = 240;
-  static const double _margemTopo = 22; // espaço para o rótulo da maior barra
-  static const double _alturaMes = 24; // faixa dos nomes dos meses
+  static const double _margemTopo = 22;
+  static const double _alturaMes = 24;
   static const double _larguraEixo = 52;
   static const int _linhas = 4;
 
@@ -122,8 +109,6 @@ class _BarrasVerticais extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Linhas de grade + números do eixo Y.
-          // RENOMEADO: 'i' agora é 'numeroDaLinha' (número da linha de grade horizontal (0 até _linhas)).
           for (int numeroDaLinha = 0; numeroDaLinha <= _linhas; numeroDaLinha++) ...[
             Positioned(
               left: 0,
@@ -145,7 +130,6 @@ class _BarrasVerticais extends StatelessWidget {
               child: Container(height: 1, color: AppColors.bordaCampo),
             ),
           ],
-          // Barras.
           Positioned.fill(
             left: _larguraEixo,
             child: Row(
@@ -186,7 +170,6 @@ class _BarraVertical extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // Barra.
           Positioned(
             left: 0,
             right: 0,
@@ -204,7 +187,6 @@ class _BarraVertical extends StatelessWidget {
               ),
             ),
           ),
-          // Valor acima da barra.
           Positioned(
             left: 0,
             right: 0,
@@ -220,7 +202,6 @@ class _BarraVertical extends StatelessWidget {
               ),
             ),
           ),
-          // Nome do mês.
           Positioned(
             left: 0,
             right: 0,
@@ -242,8 +223,6 @@ class _BarraVertical extends StatelessWidget {
   }
 }
 
-// ───────────────────────── barras horizontais (celular) ─────────────────────────
-
 class _BarrasHorizontais extends StatelessWidget {
   final List<MesDesempenho> dados;
   const _BarrasHorizontais({required this.dados});
@@ -253,7 +232,6 @@ class _BarrasHorizontais extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // RENOMEADO: 'm' agora é 'mes' (cada mês da lista de dados).
     final maximo = dados.map((mes) => mes.valor).fold<double>(0, math.max);
     final maisRecentesPrimeiro = dados.reversed.toList();
 

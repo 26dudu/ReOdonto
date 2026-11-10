@@ -9,10 +9,10 @@ class CampoCadastro extends StatelessWidget {
   final String? Function(String?)? validator;
   final TextInputType tipo;
   final List<TextInputFormatter>?
-  inputFormatters; //As regras de formatação e máscaras em tempo real
+  inputFormatters;
   final bool obscureText;
-  final bool enabled; //serve para ver se o usuario pode digitar
-  final Widget? sufixo; //tipo o olhinho da senha
+  final bool enabled;
+  final Widget? sufixo;
 
   const CampoCadastro({
     super.key,

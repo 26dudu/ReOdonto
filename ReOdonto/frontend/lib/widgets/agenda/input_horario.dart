@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-
 class InputHorario extends StatefulWidget {
-  // Horário atualmente selecionado (vem de fora, do widget pai). Pode ser
-  // nulo se o usuário ainda não escolheu nenhum horário.
   final TimeOfDay? horarioSelecionado;
 
-  // Callback chamado sempre que hora ou minuto mudam, avisando o widget
-  // pai qual horário foi escolhido.
   final ValueChanged<TimeOfDay> onHorarioSelecionado;
 
   const InputHorario({
@@ -22,28 +17,18 @@ class InputHorario extends StatefulWidget {
 }
 
 class _InputHorarioState extends State<InputHorario> {
-  // Lista fixa de minutos permitidos: intervalos de 15 em 15.
-  // Se um dia precisar mudar pra 30 em 30, basta trocar essa lista
-  // para [0, 30].
   static const List<int> _minutosPermitidos = [0, 15, 30, 45];
 
-  // Hora e minuto atualmente escolhidos nos dropdowns. Começam nulos
-  // (nada selecionado) a não ser que já venha um horário de fora.
   int? _horaSelecionada;
   int? _minutoSelecionado;
 
   @override
   void initState() {
     super.initState();
-    // Se já existe um horário vindo do widget pai, pré-seleciona os
-    // dropdowns com ele.
     _horaSelecionada = widget.horarioSelecionado?.hour;
     _minutoSelecionado = widget.horarioSelecionado?.minute;
   }
 
-  // Chamado sempre que a hora ou o minuto mudam num dos dropdowns.
-  // Só emite o horário completo pro widget pai quando os dois já
-  // estiverem preenchidos.
   void _atualizarHorario() {
     if (_horaSelecionada != null && _minutoSelecionado != null) {
       widget.onHorarioSelecionado(
@@ -52,8 +37,6 @@ class _InputHorarioState extends State<InputHorario> {
     }
   }
 
-  // Decoração compartilhada pelos dois dropdowns, pra manter o mesmo
-  // visual (borda, preenchimento, etc) usado no resto do formulário.
   InputDecoration _decoracaoDropdown(String label) {
     return InputDecoration(
       labelText: label,
@@ -78,9 +61,8 @@ class _InputHorarioState extends State<InputHorario> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start, // alinha tudo à esquerda
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Rótulo fixo acima dos dropdowns.
         const Text(
           'Horário',
           style: TextStyle(
@@ -89,11 +71,10 @@ class _InputHorarioState extends State<InputHorario> {
             color: AppColors.textoEscuro,
           ),
         ),
-        const SizedBox(height: 12), // espaçamento vertical
+        const SizedBox(height: 12),
 
         Row(
           children: [
-            // ---- Dropdown de hora (0 a 23) ----
             Expanded(
               child: DropdownButtonFormField<int>(
                 value: _horaSelecionada,
@@ -105,8 +86,6 @@ class _InputHorarioState extends State<InputHorario> {
                   color: AppColors.textoEscuro,
                 ),
                 hint: const Text('--'),
-                // Gera as opções de 0 a 23, formatadas com 2 dígitos (ex: "08").
-                // RENOMEADO: 'h' agora é 'hora' (hora (0 a 23) de cada opção do dropdown).
                 items: List.generate(24, (hora) => hora)
                     .map(
                       (hora) => DropdownMenuItem(
@@ -121,9 +100,8 @@ class _InputHorarioState extends State<InputHorario> {
                 },
               ),
             ),
-            const SizedBox(width: 12), // espaçamento entre os dois dropdowns
+            const SizedBox(width: 12),
 
-            // Dropdown de minuto (limitado aos intervalos permitidos
             Expanded(
               child: DropdownButtonFormField<int>(
                 value: _minutoSelecionado,
@@ -135,10 +113,8 @@ class _InputHorarioState extends State<InputHorario> {
                   color: AppColors.textoEscuro,
                 ),
                 hint: const Text('--'),
-                // Usa a lista fixa de minutos permitidos (0, 15, 30, 45).
                 items: _minutosPermitidos
                     .map(
-                      // RENOMEADO: 'm' agora é 'minuto' (minuto permitido (0, 15, 30, 45) de cada opção do dropdown).
                       (minuto) => DropdownMenuItem(
                         value: minuto,
                         child: Text(minuto.toString().padLeft(2, '0')),
@@ -156,7 +132,6 @@ class _InputHorarioState extends State<InputHorario> {
 
         const SizedBox(height: 8), 
 
-        // Texto avisando o intervalo permitido.
         Text(
           'Horários disponíveis de 15 em 15 minutos',
           style: TextStyle(fontSize: 12, color: AppColors.textoCinza),

@@ -1,15 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../../../../../theme/app_colors.dart';
 
-// NOVO WIDGET: era o método `_botoesEdicao` dentro da telaPerfil.dart.
-// A tela passa só o que muda (salvando / o que fazer ao salvar ou cancelar).
-
-/// Botões "Salvar Alterações" + "Cancelar" do perfil.
-/// Empilhados no celular, lado a lado (à direita) no desktop.
 class BotoesEdicaoPerfil extends StatelessWidget {
   final bool celular;
 
-  /// true enquanto a API está salvando (mostra spinner e desabilita o botão).
   final bool salvando;
   final VoidCallback onSalvar;
   final VoidCallback onCancelar;

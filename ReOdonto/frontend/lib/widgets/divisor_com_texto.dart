@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-// NOVO WIDGET: o divisor "—— ou ——" do login saiu da telaLogin.dart.
-// Pode ser reaproveitado em qualquer tela com `DivisorComTexto('ou')`.
-
-/// Linha horizontal dividida ao meio por um texto curto (ex.: "ou").
 class DivisorComTexto extends StatelessWidget {
   final String texto;
 

@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart'; 
 import '../../theme/app_colors.dart'; 
 
-
 class SignupHeader extends StatelessWidget {
-  final String titulo; // Texto principal do cabeçalho.
-  final String? subtitulo; // Texto secundário, opcional.
-  final bool mostrarLogo; // Se falso, esconde o logo do dente.
-  final bool logoNoTopo; // Se true, coloca o logo no canto superior direito em vez de acima do título.
+  final String titulo;
+  final String? subtitulo;
+  final bool mostrarLogo;
+  final bool logoNoTopo;
 
   const SignupHeader({
     super.key,

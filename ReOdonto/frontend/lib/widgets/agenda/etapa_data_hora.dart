@@ -5,9 +5,6 @@ import 'cartao_resumo.dart';
 import 'calendario_personalizado.dart';
 import 'input_horario.dart';
 
-
-// Mostra um resumo do que foi preenchido nas etapas anteriores, um calendário para escolher a data e um seletor de horário.
-
 class EtapaDataHora extends StatelessWidget {
   final String nomePaciente;
   final String tipoConsulta;

@@ -10,11 +10,6 @@ import '../widgets/menu_navegacao.dart';
 import '../widgets/pagina_com_menu.dart';
 import '../widgets/secoes_texto.dart';
 
-// TELA DE ALERTAS: os próximos horários vagos da agenda.
-//
-// É o atalho para o objetivo do app — cada horário vago aqui é dinheiro que
-// ainda dá para recuperar com um encaixe. O arquivo existia vazio e o item
-// "Alertas" do menu mostrava "em construção".
 class TelaAlertas extends StatefulWidget {
   const TelaAlertas({super.key});
 
@@ -59,12 +54,8 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
     final agora = DateTime.now();
     final vagos = resultado.dados!
         .map((item) => Agendamento.fromJson(item as Map<String, dynamic>))
-        // Só horários vagos que ainda não passaram — os outros não têm mais
-        // como ser recuperados.
-        // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento candidato a "horário vago futuro").
         .where((agendamento) => agendamento.vago && agendamento.dataHora != null && agendamento.dataHora!.isAfter(agora))
         .toList()
-      // RENOMEADO: 'a, b' agora é 'primeiro, segundo' (os dois agendamentos que o sort compara).
       ..sort((primeiro, segundo) => primeiro.dataHora!.compareTo(segundo.dataHora!));
 
     setState(() {
@@ -92,8 +83,6 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
 
     if (resultado.temErro) return mostrarAviso(context, resultado.erro!);
 
-    // O horário deixou de ser vago: sai da lista.
-    // RENOMEADO: 'a' agora é 'agendamento' (cada agendamento da lista de vagos).
     setState(() => _vagos.removeWhere((agendamento) => agendamento.id == vago.id));
     mostrarAviso(context, 'Paciente encaixado com sucesso!');
   }
@@ -120,7 +109,6 @@ class _EstadoTelaAlertas extends State<TelaAlertas> {
 
   Widget _conteudo() {
     final total = _vagos.length;
-    // RENOMEADO: 'a' agora é 'agendamento' (cada horário vago somado no fold).
     final valorEmAberto = _vagos.fold<double>(0, (soma, agendamento) => soma + (agendamento.preco ?? 0));
 
     return Column(

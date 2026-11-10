@@ -10,17 +10,9 @@ import '../widgets/cadastro/campo_cadastro.dart';
 import '../widgets/cadastro/pagina_cadastro.dart';
 import 'telaVerificarEmail.dart';
 
-// MUDANÇAS NESTE ARQUIVO (de 245 para 151 linhas):
-//  • os 5 campos recebidos (nome, email, ...) viraram UM só: `dados` (model DadosCadastro).
-//  • o Scaffold/cartão/Form/botão voltar viraram o widget PaginaCadastro.
-//  • o _IndicadorEtapa (duplicado) virou o widget IndicadorEtapa.
-//  • os dois "olhinhos" de senha viraram o widget BotaoVisibilidadeSenha.
-
 class TelaSenhaCadastro extends StatefulWidget {
-  // Dados da tela anterior (nome, e-mail, telefone, CPF/CNPJ e CRO).
   final DadosCadastro dados;
 
-  // Construtor que exige que os dados sejam enviados quando a tela for aberta.
   const TelaSenhaCadastro({super.key, required this.dados});
 
   @override
@@ -49,7 +41,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
 
     setState(() => _carregando = true);
 
-    // Espera o ApiService tentar cadastrar o usuário com os dados.
     final resultado = await ApiService.cadastrar(
       nome: widget.dados.nome,
       email: widget.dados.email,
@@ -72,7 +63,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
       'Enviamos um código para o seu email. Digite-o para concluir o cadastro.',
       sucesso: true,
     );
-    // A conta ainda não existe: só é criada quando o código for confirmado.
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => TelaVerificarEmail(email: widget.dados.email),
@@ -85,7 +75,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
   Widget build(BuildContext context) {
     return PaginaCadastro(
       formKey: _formKey,
-      // Índice 1 = segunda etapa ativa.
       etapaAtual: 1,
       children: [
         const SignupHeader(
@@ -95,7 +84,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
         ),
         const SizedBox(height: 28),
 
-        // Senha
         CampoCadastro(
           rotulo: 'Senha',
           hint: 'Mínimo 8 caracteres',
@@ -119,7 +107,6 @@ class _TelaSenhaCadastroState extends State<TelaSenhaCadastro> {
         ),
         const SizedBox(height: 20),
 
-        // Confirmar senha
         CampoCadastro(
           rotulo: 'Confirme sua senha',
           hint: 'Repita a senha',

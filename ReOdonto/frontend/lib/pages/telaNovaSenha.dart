@@ -8,13 +8,6 @@ import '../widgets/recuperarSenha/campo_login.dart';
 import '../widgets/recuperarSenha/pagina_autenticacao.dart';
 import '../widgets/recuperarSenha/requisito_senha.dart';
 
-// MUDANÇAS NESTE ARQUIVO (de 251 para 155 linhas):
-//  • o Scaffold/LayoutBuilder/rolagem/coluna/CabecalhoMarca viraram o widget PaginaAutenticacao.
-//  • título + texto explicativo viraram o widget TituloAutenticacao.
-//  • a lista "Obrigatório: ..." (e a classe _RequisitoSenha) viraram ChecklistRequisitosSenha.
-//  • os 3 getters (_temCaractereEspecial etc.) sumiram: o checklist calcula sozinho.
-//  • o "olhinho" da senha virou o widget BotaoVisibilidadeSenha.
-
 class TelaNovaSenha extends StatefulWidget {
   final String email;
 
@@ -39,7 +32,6 @@ class _TelaNovaSenhaState extends State<TelaNovaSenha> {
     super.dispose();
   }
 
-  // true quando a senha digitada cumpre os 3 requisitos.
   bool get _senhaValida => senhaAtendeRequisitos(_controladorSenha.text);
 
   Future<void> _reenviarCodigo() async {
@@ -143,12 +135,10 @@ class _TelaNovaSenhaState extends State<TelaNovaSenha> {
                 ? null
                 : () => setState(() => _ocultarSenha = !_ocultarSenha),
           ),
-          // Redesenha a tela a cada letra para atualizar o checklist abaixo.
           onChanged: (_) => setState(() {}),
         ),
         const SizedBox(height: 10),
 
-        // Lista "Obrigatório:" com os requisitos da senha (verde/vermelho).
         ChecklistRequisitosSenha(senha: _controladorSenha.text),
 
         const SizedBox(height: 28),

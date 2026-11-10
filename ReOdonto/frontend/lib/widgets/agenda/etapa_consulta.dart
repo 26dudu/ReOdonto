@@ -2,19 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../theme/app_colors.dart';
 
-// =============================================================================
-// widgets/agenda/etapa_consulta.dart  (etapa 2 do modal)
-//
-// Tipo de consulta em texto livre, mais o valor e a duração do horário.
-// O valor alimenta o "prejuízo evitado" do painel; a duração é usada pelo
-// backend para recusar horários que se sobrepõem.
-// =============================================================================
 class EtapaConsulta extends StatelessWidget {
   final TextEditingController controlador;
   final TextEditingController controladorValor;
   final TextEditingController controladorDuracao;
 
-  /// Em um horário vago o tipo de consulta é opcional.
   final bool tipoOpcional;
 
   const EtapaConsulta({
@@ -82,7 +74,6 @@ class EtapaConsulta extends StatelessWidget {
   }
 }
 
-/// "200,50" ou "200.50" -> 200.5. Devolve null se vazio ou inválido.
 double? lerValorEmReais(String texto) {
   final limpo = texto.trim().replaceAll(',', '.');
   if (limpo.isEmpty) return null;

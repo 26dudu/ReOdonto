@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../../../../theme/app_colors.dart';
 import '../../../../../../../utils/validadores.dart';
 
-// NOVO WIDGET: estes dois widgets ficavam no fim de telaNovaSenha.dart
-// (`_RequisitoSenha`) e a tela ainda tinha 3 getters + 6 linhas de
-// espaçamento só para montar a lista. Agora a tela só chama
-// `ChecklistRequisitosSenha(senha: ...)`.
-
-/// Uma linha da checklist: ícone verde/vermelho + texto.
 class RequisitoSenha extends StatelessWidget {
   final bool atendido;
   final String texto;
@@ -36,9 +30,7 @@ class RequisitoSenha extends StatelessWidget {
   }
 }
 
-/// Bloco "Obrigatório:" com os 3 requisitos da senha, atualizado ao vivo.
 class ChecklistRequisitosSenha extends StatelessWidget {
-  /// Texto da senha digitado até agora.
   final String senha;
 
   const ChecklistRequisitosSenha({super.key, required this.senha});

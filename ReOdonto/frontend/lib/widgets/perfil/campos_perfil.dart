@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-
 class CampoPerfil extends StatelessWidget {
   final String rotulo;
   final TextEditingController controlador;
@@ -61,7 +60,6 @@ class CampoPerfil extends StatelessWidget {
     );
   }
 }
-
 
 class CampoEstatico extends StatelessWidget {
   final String rotulo;

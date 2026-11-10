@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 
-/// "Pílula" arredondada usada no topo do perfil para mostrar
-/// avaliação e total de consultas.
 class PilulaInfo extends StatelessWidget {
   final String rotulo;
   final String valor;

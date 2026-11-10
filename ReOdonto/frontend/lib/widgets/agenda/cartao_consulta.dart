@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import '../../models/agendamento.dart';
 import '../../theme/app_colors.dart';
 
-// Cartão de um agendamento. As ações dependem do estado:
-//   vago      -> "Agendar Paciente"
-//   agendado  -> "Confirmar Atendimento" + "Cancelar consulta"
-//   concluído -> sem ações (o backend não permite alterar)
 class CartaoConsulta extends StatelessWidget {
   final Agendamento consulta;
   final VoidCallback? onConfirmar;
@@ -54,7 +50,6 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  /// Nome do paciente (com nota, se houver) ou "Horário vago".
   Widget _titulo() {
     if (consulta.vago) {
       return const Text(
@@ -86,7 +81,6 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  /// Linha "Rótulo: valor" (rótulo cinza, valor escuro).
   Widget _linha(String rotulo, String valor) {
     return Text.rich(
       TextSpan(
@@ -105,7 +99,6 @@ class CartaoConsulta extends StatelessWidget {
     );
   }
 
-  /// "Pílula" colorida com o status (Concluído = verde, resto = laranja).
   Widget _pilulaStatus() {
     final concluido = consulta.concluido;
     final corFundo = concluido ? AppColors.confirmado : AppColors.pendente;
@@ -161,8 +154,6 @@ class CartaoConsulta extends StatelessWidget {
           backgroundColor: AppColors.azulPrimario,
           foregroundColor: Colors.white,
           elevation: 0,
-          // 12 de padding vertical deixa o botão com ~44px de altura,
-          // o mínimo recomendado para toque.
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         ),

@@ -11,11 +11,6 @@ import '../widgets/painel/cartao_resumo_trimestre.dart';
 import '../widgets/painel/grafico_desempenho.dart';
 import '../widgets/painel/saudacao_painel.dart';
 
-// MUDANÇAS NESTE ARQUIVO (de 225 para 151 linhas): os 4 cartões do topo viraram
-// IndicadoresPainel, a saudação virou SaudacaoPainel e as 4 linhas do resumo
-// de 3 meses viraram CartaoResumoTrimestre.deResumo(...).
-
-// Mostra os números do consultório: prejuízo evitado, ociosidade, horários recuperados, pacientes encaixados, resumo de 3 meses e o gráfico mensal
 class TelaMenu extends StatefulWidget {
   const TelaMenu({super.key});
 
@@ -42,8 +37,6 @@ class _EstadoTelaMenu extends State<TelaMenu> {
       });
     }
 
-    // GET /painel/resumo — o formato do JSON está em models/resumo_painel.dart.
-    // RENOMEADO: 'r' agora é 'respostaApi' (resposta (ApiResultado) da chamada buscarResumoPainel).
     final respostaApi = await ApiService.buscarResumoPainel();
     if (!mounted) return;
 
@@ -66,7 +59,6 @@ class _EstadoTelaMenu extends State<TelaMenu> {
     });
   }
 
-  /// Primeiro nome do dentista logado ("Ana Souza" -> "Ana").
   String get _primeiroNome {
     final nome = (SessaoUsuario.nome ?? '').trim();
     return nome.isEmpty ? '' : nome.split(' ').first;
@@ -93,10 +85,8 @@ class _EstadoTelaMenu extends State<TelaMenu> {
   }
 
   Widget _conteudo(bool celular) {
-    // RENOMEADO: 'r' agora é 'dadosDoPainel' (cópia local do resumo do painel (_resumo)).
     final dadosDoPainel = _resumo;
 
-    // Cada bloco da tela agora é um widget próprio (veja os imports no topo).
     final indicadores = IndicadoresPainel(
       resumo: dadosDoPainel,
       celular: celular,
@@ -108,7 +98,6 @@ class _EstadoTelaMenu extends State<TelaMenu> {
     );
     final saudacao = SaudacaoPainel(primeiroNome: _primeiroNome);
 
-    // ───── Celular: tudo empilhado ─────
     if (celular) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +113,6 @@ class _EstadoTelaMenu extends State<TelaMenu> {
       );
     }
 
-    // ───── Desktop: título centrado, 4 cartões na linha, resumo e gráfico ─────
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

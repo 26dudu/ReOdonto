@@ -112,7 +112,7 @@ class _EstadoTelaPerfil extends State<TelaPerfil> {
 
     // Atualiza a sessão local.
     await SessaoUsuario.salvar({
-      'paciente': resultado.dados,
+      'dentista': resultado.dados,
       'token': SessaoUsuario.token,
     });
     if (!mounted) return;
